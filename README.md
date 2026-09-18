@@ -77,7 +77,7 @@ régénère pas l'icône n'a rien à installer.
 ## Commandes
 
 ```sh
-pnpm install      # installe la CLI Tauri et lie les modules du harness pour les tests
+pnpm install      # installe la CLI Tauri et copie les modules du harness pour les tests
 pnpm dev          # lance NewPi en développement, avec rechargement du Rust
 pnpm build        # produit NewPi.app et une image .dmg dans src-tauri/target/release/bundle
 pnpm build:app    # produit seulement l'application, sans image disque
@@ -91,6 +91,17 @@ pnpm verify:console    # pilote un vrai navigateur sur les sections Memory et Ba
 pnpm verify:projects   # pilote un vrai navigateur sur la section Projets
 pnpm verify:projects-git  # monte un dépôt et un distant bare isolés, et prouve la zone Git dans l'interface
 pnpm verify:projects-capability  # vrai moteur et vraie interface : réseau refusé, autorisé, refusé, sans dépôt ni réseau
+```
+
+Si `pnpm install` échoue sur
+`EPERM: operation not permitted, chmod .../@deepseek-ai/cordis/bin.js`, le
+`node_modules` date d'une version où ces modules étaient des **liens** vers le
+harness : pnpm refuse de réparer un lien qui sort du projet, et s'arrête avant
+les scripts. Le script de post-installation les copie désormais dans le projet.
+Un seul nettoyage suffit :
+
+```sh
+rm -rf node_modules/@deepseek-ai && pnpm install
 ```
 
 `pnpm verify:console` ne démarre rien : il lui faut l'URL que NewPi imprime au
@@ -1275,7 +1286,7 @@ newpi/
 │   ├── make-icon.mjs         rastérise logo.svg en icône source
 │   ├── pocketbase-pin.mjs    version et empreintes du sidecar
 │   ├── fetch-pocketbase.mjs  télécharge et vérifie l'archive épinglée
-│   ├── link-harness-modules.mjs  lie les modules du harness pour les tests
+│   ├── link-harness-modules.mjs  copie les modules du harness pour les tests
 │   ├── verify-running-newpi.mjs  contrôle d'acceptation sur une instance vivante
 │   ├── probe-console-ui.mjs  pilote un vrai navigateur sur les deux sections
 │   ├── probe-projects-ui.mjs  pilote un vrai navigateur sur la section Projets

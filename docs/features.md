@@ -519,7 +519,7 @@ route authentifiée sur la connexion partagée.
 ## 5. Exploitation
 
 ```sh
-pnpm install      # CLI Tauri et liens des modules du harness pour les tests
+pnpm install      # CLI Tauri et copies des modules du harness pour les tests
 pnpm dev          # NewPi en développement, rechargement du Rust
 pnpm build        # NewPi.app et une image .dmg
 pnpm build:app    # seulement l'application, sans image disque
