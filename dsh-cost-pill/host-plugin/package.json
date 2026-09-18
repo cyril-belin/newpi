@@ -1,0 +1,11 @@
+{
+  "name": "dsh-cost-projection",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH host plugin: a `cost` session projection pricing provider-reported token buckets.",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+.pnpm-store/
+assets/icon-source.png
+.dsh-test/
+.DS_Store
+.npm-cache-vendor/
+.cache/

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">NewPi</title>
+  <desc id="desc">A luminous pi symbol in a dark blue rounded square.</desc>
+  <defs>
+    <linearGradient id="bg" x1="56" y1="40" x2="456" y2="472" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#142b5d"/>
+      <stop offset=".52" stop-color="#0a183b"/>
+      <stop offset="1" stop-color="#060c21"/>
+    </linearGradient>
+    <linearGradient id="pi" x1="186" y1="130" x2="338" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#85f5ff"/>
+      <stop offset=".45" stop-color="#39b8ff"/>
+      <stop offset="1" stop-color="#596cff"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="13" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="22" y="22" width="468" height="468" rx="112" fill="url(#bg)"/>
+  <rect x="31" y="31" width="450" height="450" rx="103" fill="none" stroke="#89dfff" stroke-opacity=".2" stroke-width="3"/>
+  <path d="M147 169h218v54h-48v120c0 29 8 43 27 43 9 0 18-3 28-9v49c-15 10-34 15-55 15-36 0-59-15-67-45-5-16-7-37-7-63V223h-42c1 49-4 91-15 124-14 41-42 70-84 87l-27-42c29-15 48-36 58-64 8-24 12-59 11-105h-48z" fill="url(#pi)" filter="url(#glow)"/>
+  <circle cx="385" cy="136" r="10" fill="#91f6ff" opacity=".9"/>
+</svg>

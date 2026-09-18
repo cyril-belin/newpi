@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions for the local NewPi boot screen. The interface window is created at runtime from a loopback URL and is deliberately absent here, so the interface page receives no Tauri API.",
+  "windows": ["splash"],
+  "permissions": ["core:event:default"]
+}

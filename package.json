@@ -1,0 +1,32 @@
+{
+  "name": "newpi",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "NewPi: a native macOS desktop application, packaged with Tauri.",
+  "scripts": {
+    "postinstall": "node scripts/link-harness-modules.mjs",
+    "predev": "node scripts/fetch-pocketbase.mjs",
+    "dev": "tauri dev",
+    "prebuild": "node scripts/fetch-pocketbase.mjs",
+    "build:app": "tauri build --bundles app",
+    "build": "tauri build && node scripts/clean-bundle.mjs",
+    "tauri": "tauri",
+    "icon": "node scripts/make-icon.mjs && tauri icon assets/icon-source.png",
+    "pretest": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test": "node --test tests/*.test.mjs",
+    "test:pocketbase": "node tests/pocketbase-live.mjs",
+    "test:backup": "node tests/backup-live.mjs",
+    "verify:running": "node scripts/verify-running-newpi.mjs",
+    "verify:console": "node scripts/probe-console-ui.mjs",
+    "verify:projects": "node scripts/probe-projects-ui.mjs",
+    "verify:projects-git": "node scripts/probe-projects-git-ui.mjs",
+    "verify:projects-capability": "node scripts/probe-projects-capability-ui.mjs",
+    "storage": "node scripts/storage.mjs",
+    "acceptance:session": "node scripts/acceptance-memory-e2e.mjs",
+    "fetch:pocketbase": "node scripts/fetch-pocketbase.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

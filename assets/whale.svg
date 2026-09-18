@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">NewPi whale</title>
+  <desc id="desc">NewPi's whale mark: silhouette and pi, drawn for the sidebar.</desc>
+  <defs>
+    <linearGradient id="ocean" x1="90" y1="83" x2="419" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#132b5c"/><stop offset="1" stop-color="#071127"/>
+    </linearGradient>
+    <linearGradient id="whale" x1="142" y1="149" x2="388" y2="383" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fcfcfa"/><stop offset="1" stop-color="#c9d7ec"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="18" width="476" height="476" rx="118" fill="url(#ocean)"/>
+  <path d="M112 328c30-9 56-28 75-56-5-36 4-68 27-93 26-28 60-40 98-34 39 6 68 29 85 65 14-7 28-8 41-2-3 19-13 35-29 47-1 49-27 87-76 108-46 20-98 18-144-7-28 1-55-9-77-29z" fill="url(#whale)"/>
+  <path d="M187 272c11-4 22-5 33-2-8 13-13 29-14 46-16-5-28-16-35-31 5-6 10-10 16-13z" fill="#9fb5d4"/>
+  <path d="M216 208c-10-30-3-57 20-80 4 23 14 39 31 50" fill="none" stroke="#dff8ff" stroke-width="13" stroke-linecap="round"/>
+  <path d="M266 177c7-24 20-41 40-52-2 26 5 45 21 58" fill="none" stroke="#dff8ff" stroke-width="13" stroke-linecap="round"/>
+  <circle cx="338" cy="244" r="10" fill="#101c35"/>
+  <circle cx="341" cy="241" r="3" fill="#fff"/>
+  <path d="M320 283c16 9 34 8 49-2" fill="none" stroke="#7188aa" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="272" cy="313" r="47" fill="#162e61"/>
+  <path d="M244 289h57v12h-12v27c0 9 3 14 9 14 4 0 7-1 10-4v13c-6 4-12 6-19 6-13 0-21-6-24-18-2-7-2-19-2-38h-12c0 20-2 35-6 45-5 14-15 24-29 30l-9-12c10-6 17-13 21-24 3-8 4-21 4-39h12z" fill="#edfbff"/>
+</svg>

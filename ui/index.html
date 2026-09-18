@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NewPi</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #070b14;
+        --panel: #0e1626;
+        --line: #1e293b;
+        --text: #e2e8f0;
+        --muted: #7c8aa5;
+        --accent: #38bdf8;
+        --danger: #f87171;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        background: radial-gradient(120% 90% at 50% 0%, #101b30 0%, var(--bg) 60%);
+        color: var(--text);
+        font: 14px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        width: min(460px, 82vw);
+        text-align: center;
+      }
+      .mark {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 22px;
+        border-radius: 16px;
+        background: linear-gradient(160deg, #16243d, #0a1120);
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        font-size: 30px;
+        font-weight: 600;
+        background-clip: padding-box;
+        color: var(--accent);
+        letter-spacing: -1px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .bar {
+        margin-top: 26px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--line);
+        overflow: hidden;
+      }
+      .bar span {
+        display: block;
+        height: 100%;
+        width: 34%;
+        border-radius: 2px;
+        background: linear-gradient(90deg, #38bdf8, #818cf8);
+        animation: slide 1.25s ease-in-out infinite;
+      }
+      @keyframes slide {
+        0% {
+          transform: translateX(-110%);
+        }
+        100% {
+          transform: translateX(320%);
+        }
+      }
+      .detail {
+        margin-top: 18px;
+        display: none;
+        text-align: left;
+        font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #cbd5e1;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px 14px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 40vh;
+        overflow: auto;
+      }
+      body[data-state="error"] .bar {
+        display: none;
+      }
+      body[data-state="error"] h1 {
+        color: var(--danger);
+      }
+      body[data-state="error"] .detail {
+        display: block;
+      }
+      body[data-state="ready"] .bar span {
+        animation: none;
+        width: 100%;
+        transform: none;
+      }
+    </style>
+  </head>
+  <body data-state="starting">
+    <main>
+      <div class="mark">π</div>
+      <h1 id="title">Démarrage du runtime local</h1>
+      <p id="message">NewPi prépare son interface sur cette machine.</p>
+      <div class="bar"><span></span></div>
+      <pre class="detail" id="detail"></pre>
+    </main>
+
+    <script>
+      // The splash is plain local content. It only listens for status events
+      // emitted by the Rust supervisor; the interface window that replaces it
+      // is loaded from loopback origin and never receives any Tauri API.
+      const title = document.getElementById("title");
+      const message = document.getElementById("message");
+      const detail = document.getElementById("detail");
+
+      function render(payload) {
+        const state = payload && payload.state ? payload.state : "starting";
+        document.body.dataset.state = state;
+        if (payload && payload.title) title.textContent = payload.title;
+        if (payload && payload.message) message.textContent = payload.message;
+        if (payload && payload.detail) detail.textContent = payload.detail;
+      }
+
+      const api = window.__TAURI__;
+      if (api && api.event && typeof api.event.listen === "function") {
+        api.event.listen("newpi-status", (event) => render(event.payload));
+      } else {
+        message.textContent =
+          "Le pont d'évènements Tauri n'est pas disponible. Le runtime démarre quand même.";
+      }
+    </script>
+  </body>
+</html>

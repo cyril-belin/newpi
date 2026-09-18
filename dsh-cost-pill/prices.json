@@ -1,0 +1,42 @@
+{
+  "_comment": "Prix en USD par million de tokens. Chaque valeur est de l'argent par million de tokens ; les cles sont des routes 'provider/model'.",
+  "_calibration": "Calibre le 2026-09-18 sur le tableau de bord DeepSeek (8.06 USD, 5,869 requetes, 1,267,739,345 tokens) recoupe avec 39 logs de session locaux : 5,572 requetes / 1,266,166,340 tokens (100% du volume, 95% des requetes). Le tarif effectif vaut 0.208x la grille publique V3.2-Exp utilisee comme placeholder. Voir audit-usage.mjs pour refaire le calcul.",
+  "currency": "$",
+  "unitLabel": "per 1M tokens",
+  "fallback": {
+    "cacheHit": 0.0058,
+    "cacheMiss": 0.0581,
+    "cacheWrite": 0.0581,
+    "output": 0.0872
+  },
+  "models": {
+    "deepseek-official/deepseek-flash": {
+      "_source": "calibre sur le tableau de bord (modele reellement utilise)",
+      "cacheHit": 0.0058,
+      "cacheMiss": 0.0581,
+      "cacheWrite": 0.0581,
+      "output": 0.0872
+    },
+    "deepseek-official/deepseek-v4-flash": {
+      "_source": "NON MESURE - copie des tarifs deepseek-flash, a verifier",
+      "cacheHit": 0.0058,
+      "cacheMiss": 0.0581,
+      "cacheWrite": 0.0581,
+      "output": 0.0872
+    },
+    "deepseek-official/deepseek-v4-pro": {
+      "_source": "NON MESURE - copie des tarifs deepseek-flash, a verifier (un modele 'pro' coute generalement plus cher)",
+      "cacheHit": 0.0058,
+      "cacheMiss": 0.0581,
+      "cacheWrite": 0.0581,
+      "output": 0.0872
+    },
+    "deepseek-official/deepseek-v4-flash-vision-exp": {
+      "_source": "NON MESURE - copie des tarifs deepseek-flash, a verifier",
+      "cacheHit": 0.0058,
+      "cacheMiss": 0.0581,
+      "cacheWrite": 0.0581,
+      "output": 0.0872
+    }
+  }
+}
