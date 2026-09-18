@@ -96,8 +96,8 @@ impl DevSource {
     /// @param state - the state directory, for a relative path.
     /// @returns the source, or a message naming what is wrong.
     pub fn parse(text: &str, state: &Path) -> Result<Self, String> {
-        let document: Value =
-            serde_json::from_str(text).map_err(|error| format!("{DEV_FILENAME} illisible : {error}"))?;
+        let document: Value = serde_json::from_str(text)
+            .map_err(|error| format!("{DEV_FILENAME} illisible : {error}"))?;
         let declared = document
             .get("pluginsDir")
             .and_then(Value::as_str)
@@ -115,7 +115,10 @@ impl DevSource {
         }
         Ok(Self {
             plugins,
-            reload: document.get("reload").and_then(Value::as_bool).unwrap_or(false),
+            reload: document
+                .get("reload")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         })
     }
 
@@ -151,7 +154,12 @@ impl DevSource {
         // FNV-1a over the ordered walk: stable across runs, no dependency.
         let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
         for (path, stamp) in files {
-            for byte in path.to_string_lossy().as_bytes().iter().chain(&stamp.to_le_bytes()) {
+            for byte in path
+                .to_string_lossy()
+                .as_bytes()
+                .iter()
+                .chain(&stamp.to_le_bytes())
+            {
                 hash ^= u64::from(*byte);
                 hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
             }
@@ -252,10 +260,18 @@ mod tests {
         assert_eq!(DevSource::read(&state), None);
 
         fs::write(state.join(DEV_FILENAME), "{\"reload\": true}").unwrap();
-        assert_eq!(DevSource::read(&state), None, "pluginsDir is what makes a source");
+        assert_eq!(
+            DevSource::read(&state),
+            None,
+            "pluginsDir is what makes a source"
+        );
 
         fs::write(state.join(DEV_FILENAME), "{\"pluginsDir\": \"nowhere\"}").unwrap();
-        assert_eq!(DevSource::read(&state), None, "a directory that is not one is refused");
+        assert_eq!(
+            DevSource::read(&state),
+            None,
+            "a directory that is not one is refused"
+        );
 
         fs::remove_dir_all(&state).unwrap();
     }
@@ -265,7 +281,11 @@ mod tests {
         let state = scratch("relative");
         fs::create_dir_all(state.join("plugins/model-router")).unwrap();
         fs::write(state.join("plugins/model-router/index.js"), "// entry").unwrap();
-        fs::write(state.join(DEV_FILENAME), "{\"pluginsDir\": \"plugins\", \"reload\": true}").unwrap();
+        fs::write(
+            state.join(DEV_FILENAME),
+            "{\"pluginsDir\": \"plugins\", \"reload\": true}",
+        )
+        .unwrap();
 
         let source = DevSource::read(&state).unwrap();
         assert!(source.reload());
@@ -273,7 +293,11 @@ mod tests {
             source.entry("model-router"),
             Some(state.join("plugins/model-router/index.js")),
         );
-        assert_eq!(source.entry("absent"), None, "a plugin the directory omits is not provided");
+        assert_eq!(
+            source.entry("absent"),
+            None,
+            "a plugin the directory omits is not provided"
+        );
 
         fs::remove_dir_all(&state).unwrap();
     }
@@ -286,7 +310,11 @@ mod tests {
         fs::write(state.join(DEV_FILENAME), "{\"pluginsDir\": \"plugins\"}").unwrap();
 
         let source = DevSource::read(&state).unwrap();
-        assert_eq!(source.reload(), false, "restarting a live runtime is opt-in");
+        assert_eq!(
+            source.reload(),
+            false,
+            "restarting a live runtime is opt-in"
+        );
 
         fs::remove_dir_all(&state).unwrap();
     }
@@ -302,7 +330,11 @@ mod tests {
 
         let source = DevSource::read(&state).unwrap();
         let before = source.fingerprint();
-        assert_eq!(before, source.fingerprint(), "a still tree is a stable fingerprint");
+        assert_eq!(
+            before,
+            source.fingerprint(),
+            "a still tree is a stable fingerprint"
+        );
 
         fs::write(&entry, "// one, but longer").unwrap();
         assert_ne!(before, source.fingerprint(), "a write is noticed");

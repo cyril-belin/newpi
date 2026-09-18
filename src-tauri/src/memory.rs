@@ -193,7 +193,9 @@ fn prune(
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
         let child = relative.join(name);
-        let Some(child_text) = child.to_str() else { continue };
+        let Some(child_text) = child.to_str() else {
+            continue;
+        };
 
         if entry.path().is_dir() {
             prune(directory, &child, expected, removed)?;
@@ -210,7 +212,10 @@ fn prune(
 
         if !expected.contains(&child_text) {
             std::fs::remove_file(entry.path()).map_err(|error| {
-                format!("Suppression impossible de {} : {error}", entry.path().display())
+                format!(
+                    "Suppression impossible de {} : {error}",
+                    entry.path().display()
+                )
             })?;
             *removed += 1;
         }
@@ -237,7 +242,10 @@ fn prune(
 /// plugins it provides are left alone, because the repository owns them.
 /// @returns the number of files written and removed, for the launch report.
 /// @throws a message naming the path when a write or prune fails.
-pub fn deploy_assets(layout: &Layout, dev: Option<&crate::dev::DevSource>) -> Result<(usize, usize), String> {
+pub fn deploy_assets(
+    layout: &Layout,
+    dev: Option<&crate::dev::DevSource>,
+) -> Result<(usize, usize), String> {
     let mut written = 0;
     let mut removed = 0;
 
@@ -249,9 +257,8 @@ pub fn deploy_assets(layout: &Layout, dev: Option<&crate::dev::DevSource>) -> Re
             continue;
         }
         let directory = layout.plugins.join(plugin);
-        std::fs::create_dir_all(&directory).map_err(|error| {
-            format!("Création impossible de {} : {error}", directory.display())
-        })?;
+        std::fs::create_dir_all(&directory)
+            .map_err(|error| format!("Création impossible de {} : {error}", directory.display()))?;
 
         let mut expected: Vec<&str> = Vec::with_capacity(files.len());
         for (name, source) in *files {
@@ -311,7 +318,10 @@ fn prune_plugins(layout: &Layout, dev: Option<&crate::dev::DevSource>) -> Result
             continue;
         }
         std::fs::remove_dir_all(entry.path()).map_err(|error| {
-            format!("Suppression impossible de {} : {error}", entry.path().display())
+            format!(
+                "Suppression impossible de {} : {error}",
+                entry.path().display()
+            )
         })?;
         removed += 1;
     }
@@ -345,7 +355,10 @@ pub fn link_module_tree(layout: &Layout, dsh_home: &Path) -> Option<PathBuf> {
     }
 
     let candidates = [dsh_home.join("profiles").join("node_modules")];
-    let source = candidates.iter().find(|candidate| candidate.is_dir())?.clone();
+    let source = candidates
+        .iter()
+        .find(|candidate| candidate.is_dir())?
+        .clone();
 
     std::os::unix::fs::symlink(&source, &link).ok()?;
     Some(source)
@@ -371,9 +384,8 @@ impl Project {
     pub fn resolve(workspace: &Path) -> Result<Self, String> {
         let config = workspace.join(PROJECT_CONFIG);
         if config.is_file() {
-            let text = std::fs::read_to_string(&config).map_err(|error| {
-                format!("Lecture impossible de {} : {error}", config.display())
-            })?;
+            let text = std::fs::read_to_string(&config)
+                .map_err(|error| format!("Lecture impossible de {} : {error}", config.display()))?;
             if let Some(id) = project_id_in(&text) {
                 return Ok(Self {
                     id,
@@ -691,16 +703,25 @@ pub fn rows(
     // rendered page. It owns no endpoint and no state of its own, so it stays
     // mounted whether or not a sidecar came up: choosing a project has nothing
     // to do with the memory database.
-    rows.push(Row::plugin("projects-console", &entry(layout, dev, "projects-console")));
+    rows.push(Row::plugin(
+        "projects-console",
+        &entry(layout, dev, "projects-console"),
+    ));
 
     // The backend carries the project scope in its configuration: this is the
     // single place the scope enters the harness, and the provider reads it from
     // the service rather than from a tool argument.
     rows.push(
-        Row::plugin("pocketbase-memory", &entry(layout, dev, "pocketbase-memory"))
-            .with_config("projectId", project.id.clone()),
+        Row::plugin(
+            "pocketbase-memory",
+            &entry(layout, dev, "pocketbase-memory"),
+        )
+        .with_config("projectId", project.id.clone()),
     );
-    rows.push(Row::plugin("memory-tools", &entry(layout, dev, "memory-tools")));
+    rows.push(Row::plugin(
+        "memory-tools",
+        &entry(layout, dev, "memory-tools"),
+    ));
 
     // The console carries the two paths and the two versions its manifests
     // need. None of them is a secret: the credential and the sidecar's URL stay
@@ -752,7 +773,10 @@ pub fn rows(
     );
 
     if mem0_installed {
-        rows.push(Row::disabled_package(MEM0_ROW_ID, "@deepseek-ai/dsh-memory-mem0"));
+        rows.push(Row::disabled_package(
+            MEM0_ROW_ID,
+            "@deepseek-ai/dsh-memory-mem0",
+        ));
     }
 
     rows
@@ -832,7 +856,10 @@ mod tests {
     #[test]
     fn ignores_a_project_id_that_belongs_to_another_block() {
         // Deeper than a direct child of `memory:`.
-        assert_eq!(project_id_in("memory:\n  nested:\n    project_id: nope\n"), None);
+        assert_eq!(
+            project_id_in("memory:\n  nested:\n    project_id: nope\n"),
+            None
+        );
         // A different top level block entirely.
         assert_eq!(project_id_in("other:\n  project_id: nope\n"), None);
     }
@@ -878,7 +905,11 @@ mod tests {
             id: "twin".to_string(),
             source: None,
         };
-        let roots = Roots::new(Path::new("/workspace"), Path::new("/home"), Path::new("/home/.dsh"));
+        let roots = Roots::new(
+            Path::new("/workspace"),
+            Path::new("/home"),
+            Path::new("/home/.dsh"),
+        );
         let rows = rows(&layout, &project, &roots, true, None);
         assert_eq!(rows.len(), 10);
 
@@ -889,8 +920,14 @@ mod tests {
         assert!(rows[0].name.starts_with("file://"));
         assert!(rows[0].name.ends_with("/plugins/newpi-brand/index.js"));
         assert!(!rows[0].disabled);
-        let whale = rows[0].config.get("whale").expect("the mark artwork is missing");
-        assert!(whale.starts_with("<svg"), "the XML declaration must be stripped");
+        let whale = rows[0]
+            .config
+            .get("whale")
+            .expect("the mark artwork is missing");
+        assert!(
+            whale.starts_with("<svg"),
+            "the XML declaration must be stripped"
+        );
         assert!(whale.contains("</svg>"));
         assert!(!whale.contains("<?xml"));
 
@@ -914,16 +951,39 @@ mod tests {
             ],
             "the project row must carry the project facts and nothing else",
         );
-        assert_eq!(model.config.get("stateDir").map(String::as_str), Some("/state"));
-        assert_eq!(model.config.get("workspace").map(String::as_str), Some("/workspace"));
-        assert_eq!(model.config.get("projectId").map(String::as_str), Some("twin"));
-        assert_eq!(model.config.get("name").map(String::as_str), Some("workspace"));
-        assert_eq!(model.config.get("memoryNamespace").map(String::as_str), Some("twin"));
+        assert_eq!(
+            model.config.get("stateDir").map(String::as_str),
+            Some("/state")
+        );
+        assert_eq!(
+            model.config.get("workspace").map(String::as_str),
+            Some("/workspace")
+        );
+        assert_eq!(
+            model.config.get("projectId").map(String::as_str),
+            Some("twin")
+        );
+        assert_eq!(
+            model.config.get("name").map(String::as_str),
+            Some("workspace")
+        );
+        assert_eq!(
+            model.config.get("memoryNamespace").map(String::as_str),
+            Some("twin")
+        );
 
-        let backend = rows.iter().find(|row| row.id == "pocketbase-memory").unwrap();
+        let backend = rows
+            .iter()
+            .find(|row| row.id == "pocketbase-memory")
+            .unwrap();
         assert!(backend.name.starts_with("file://"));
-        assert!(backend.name.ends_with("/plugins/pocketbase-memory/index.js"));
-        assert_eq!(backend.config.get("projectId").map(String::as_str), Some("twin"));
+        assert!(backend
+            .name
+            .ends_with("/plugins/pocketbase-memory/index.js"));
+        assert_eq!(
+            backend.config.get("projectId").map(String::as_str),
+            Some("twin")
+        );
 
         let tools = rows.iter().find(|row| row.id == "memory-tools").unwrap();
         assert!(tools.name.ends_with("/plugins/memory-tools/index.js"));
@@ -983,15 +1043,30 @@ mod tests {
             ],
             "the storage row must carry the roots and nothing else",
         );
-        assert_eq!(storage.config.get("workspace").map(String::as_str), Some("/workspace"));
-        assert_eq!(storage.config.get("home").map(String::as_str), Some("/home"));
-        assert_eq!(storage.config.get("dshHome").map(String::as_str), Some("/home/.dsh"));
-        assert_eq!(storage.config.get("stateDir").map(String::as_str), Some("/state"));
+        assert_eq!(
+            storage.config.get("workspace").map(String::as_str),
+            Some("/workspace")
+        );
+        assert_eq!(
+            storage.config.get("home").map(String::as_str),
+            Some("/home")
+        );
+        assert_eq!(
+            storage.config.get("dshHome").map(String::as_str),
+            Some("/home/.dsh")
+        );
+        assert_eq!(
+            storage.config.get("stateDir").map(String::as_str),
+            Some("/state")
+        );
         assert_eq!(
             storage.config.get("dataDir").map(String::as_str),
             Some("/state/pocketbase/pb_data"),
         );
-        assert_eq!(storage.config.get("backupDir").map(String::as_str), Some("/state/backups"));
+        assert_eq!(
+            storage.config.get("backupDir").map(String::as_str),
+            Some("/state/backups")
+        );
         assert!(
             storage
                 .config
@@ -1003,9 +1078,14 @@ mod tests {
         // The context & cache manager is mounted unconditionally and carries no
         // configuration at all: it observes, it decides nothing, and there is
         // therefore no key here that could become a second policy.
-        let manager = rows.iter().find(|row| row.id == "context-cache-manager").unwrap();
+        let manager = rows
+            .iter()
+            .find(|row| row.id == "context-cache-manager")
+            .unwrap();
         assert!(manager.name.starts_with("file://"));
-        assert!(manager.name.ends_with("/plugins/context-cache-manager/index.js"));
+        assert!(manager
+            .name
+            .ends_with("/plugins/context-cache-manager/index.js"));
         assert!(!manager.disabled);
         assert!(
             manager.config.is_empty(),
@@ -1022,7 +1102,10 @@ mod tests {
         // backup the user asked for must not be inside it.
         let layout = Layout::new(Path::new("/state"));
         assert_eq!(layout.backups, Path::new("/state/backups"));
-        assert_eq!(layout.snapshots(), Path::new("/state/pocketbase/pb_data/backups"));
+        assert_eq!(
+            layout.snapshots(),
+            Path::new("/state/pocketbase/pb_data/backups")
+        );
         assert!(!layout.snapshots().starts_with(&layout.backups));
 
         let state = std::env::temp_dir().join("newpi-layout-test");
@@ -1042,7 +1125,11 @@ mod tests {
             id: "twin".to_string(),
             source: None,
         };
-        let roots = Roots::new(Path::new("/workspace"), Path::new("/home"), Path::new("/home/.dsh"));
+        let roots = Roots::new(
+            Path::new("/workspace"),
+            Path::new("/home"),
+            Path::new("/home/.dsh"),
+        );
         let rows = rows(&layout, &project, &roots, false, None);
         assert_eq!(rows.len(), 9);
         assert!(rows.iter().all(|row| !row.disabled));
@@ -1089,11 +1176,20 @@ mod tests {
 
         let (written, removed) = deploy_assets(&layout, None).unwrap();
         assert!(written >= 5, "expected every embedded file to be written");
-        assert_eq!(removed, 3, "two stale files and one stale plugin must be pruned");
+        assert_eq!(
+            removed, 3,
+            "two stale files and one stale plugin must be pruned"
+        );
         assert!(!backend.join("removed-later.js").exists());
         assert!(!nested.join("removed-later.json").exists());
-        assert!(!stale.exists(), "a plugin the build no longer ships must be removed");
-        assert!(modules.exists(), "the module tree is not this deploy's to remove");
+        assert!(
+            !stale.exists(),
+            "a plugin the build no longer ships must be removed"
+        );
+        assert!(
+            modules.exists(),
+            "the module tree is not this deploy's to remove"
+        );
         assert!(layout.migrations.join(crate::assets::MIGRATION.0).is_file());
 
         // A second pass is a no-op: nothing is rewritten when nothing changed.
@@ -1114,10 +1210,22 @@ mod tests {
         // two plugins: one the manifest also ships, one it does not.
         let dev_root = state.join("dev");
         std::fs::create_dir_all(dev_root.join("model-router")).unwrap();
-        std::fs::write(dev_root.join("model-router/index.js"), "// from the repository").unwrap();
-        std::fs::write(dev_root.join("model-router/adaptive.js"), "// only the repository has this").unwrap();
+        std::fs::write(
+            dev_root.join("model-router/index.js"),
+            "// from the repository",
+        )
+        .unwrap();
+        std::fs::write(
+            dev_root.join("model-router/adaptive.js"),
+            "// only the repository has this",
+        )
+        .unwrap();
         std::fs::create_dir_all(dev_root.join("local-console")).unwrap();
-        std::fs::write(dev_root.join("local-console/index.js"), "// a plugin only the source has").unwrap();
+        std::fs::write(
+            dev_root.join("local-console/index.js"),
+            "// a plugin only the source has",
+        )
+        .unwrap();
         let source = crate::dev::DevSource::parse(
             &format!("{{\"pluginsDir\": \"{}\"}}", dev_root.display()),
             &state,
@@ -1127,13 +1235,23 @@ mod tests {
         // Stale state the deploy would normally own: a deployed copy of a
         // provided plugin, and a directory belonging to no shipped plugin.
         std::fs::create_dir_all(layout.plugins.join("model-router")).unwrap();
-        std::fs::write(layout.plugins.join("model-router/index.js"), "// an old embedded build").unwrap();
+        std::fs::write(
+            layout.plugins.join("model-router/index.js"),
+            "// an old embedded build",
+        )
+        .unwrap();
         std::fs::create_dir_all(layout.plugins.join("local-console")).unwrap();
         std::fs::write(layout.plugins.join("local-console/index.js"), "// stale").unwrap();
 
         let (written, removed) = deploy_assets(&layout, Some(&source)).unwrap();
-        assert!(written > 0, "every plugin the source does not provide is still deployed");
-        assert_eq!(removed, 0, "nothing the source provides is this deploy's to remove");
+        assert!(
+            written > 0,
+            "every plugin the source does not provide is still deployed"
+        );
+        assert_eq!(
+            removed, 0,
+            "nothing the source provides is this deploy's to remove"
+        );
         assert_eq!(
             std::fs::read_to_string(dev_root.join("model-router/index.js")).unwrap(),
             "// from the repository",

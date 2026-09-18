@@ -183,8 +183,11 @@ mod tests {
         // A project id is user input, so it must not be able to inject a row.
         // The value is both flattened and quoted: the injected line cannot
         // become a list item, and the quote cannot close the scalar.
-        let row = Row::plugin("memory-tools", Path::new("/tmp/plugins/memory-tools/index.js"))
-            .with_config("projectId", "it's a trap\n- insert:");
+        let row = Row::plugin(
+            "memory-tools",
+            Path::new("/tmp/plugins/memory-tools/index.js"),
+        )
+        .with_config("projectId", "it's a trap\n- insert:");
         let text = render(&[row]);
         assert!(text.contains("projectId: 'it''s a trap - insert:'"));
         // Only the document's own header introduces a top level list.
@@ -214,7 +217,9 @@ mod tests {
             text[alpha..].find("alpha: '2'").unwrap() < text[alpha..].find("zeta: '1'").unwrap(),
             "config keys must be emitted in sorted order",
         );
-        assert!(text.find("- id: 'alpha-plugin'").unwrap() < text.find("- id: 'beta-plugin'").unwrap());
+        assert!(
+            text.find("- id: 'alpha-plugin'").unwrap() < text.find("- id: 'beta-plugin'").unwrap()
+        );
     }
 
     /// Write one rendered patch to a known path so the Node test suite can

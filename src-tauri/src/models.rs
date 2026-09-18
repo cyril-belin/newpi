@@ -66,7 +66,14 @@ pub const ROW_ID: &str = "model-router";
 
 /// The role vocabulary. A role is a *task* the router answers for; it is never
 /// a provider or a model, and the two must not be conflated.
-pub const ROLES: [&str; 6] = ["fast", "coding", "reasoning", "research", "review", "default"];
+pub const ROLES: [&str; 6] = [
+    "fast",
+    "coding",
+    "reasoning",
+    "research",
+    "review",
+    "default",
+];
 
 /// Keys anywhere in the block that would mean a secret was placed here.
 ///
@@ -248,7 +255,11 @@ impl Plan {
         let mut cursor = 0;
         let root = build(&entries, &mut cursor, None)?;
         assert_no_secrets(&root, CONFIG_SECTION)?;
-        expect_keys(&root, &["mode", "manual", "active", "roles", "requirements"], CONFIG_SECTION)?;
+        expect_keys(
+            &root,
+            &["mode", "manual", "active", "roles", "requirements"],
+            CONFIG_SECTION,
+        )?;
 
         let mode_value = expect_scalar(&root, "mode", CONFIG_SECTION, true)?
             .ok_or_else(|| format!("{CONFIG_SECTION}.mode is required"))?;
@@ -346,8 +357,10 @@ impl Plan {
     /// @returns the row.
     /// @throws a message when the plan cannot be serialized.
     pub fn row(&self, layout: &crate::memory::Layout) -> Result<Row, String> {
-        Ok(Row::plugin(ROW_ID, &layout.plugins.join("model-router/index.js"))
-            .with_config("plan", self.to_json()?))
+        Ok(
+            Row::plugin(ROW_ID, &layout.plugins.join("model-router/index.js"))
+                .with_config("plan", self.to_json()?),
+        )
     }
 }
 
@@ -451,7 +464,11 @@ fn split_key(trimmed: &str, number: usize) -> Result<(String, Option<String>), S
 }
 
 /// Build the block's tree from its flat, indentation-tagged lines.
-fn build(entries: &[Entry], cursor: &mut usize, parent: Option<usize>) -> Result<Vec<Node>, String> {
+fn build(
+    entries: &[Entry],
+    cursor: &mut usize,
+    parent: Option<usize>,
+) -> Result<Vec<Node>, String> {
     let mut nodes: Vec<Node> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
     let mut child_indent: Option<usize> = None;
@@ -675,10 +692,7 @@ mod tests {
 
     #[test]
     fn an_absent_block_mounts_no_router() {
-        assert_eq!(
-            Plan::parse("memory:\n  project_id: twin\n").unwrap(),
-            None,
-        );
+        assert_eq!(Plan::parse("memory:\n  project_id: twin\n").unwrap(), None,);
         assert_eq!(Plan::parse("").unwrap(), None);
     }
 
@@ -709,7 +723,10 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(plan.mode, Mode::Switch);
-        assert_eq!(plan.active.unwrap().reasoning_effort.as_deref(), Some("high"));
+        assert_eq!(
+            plan.active.unwrap().reasoning_effort.as_deref(),
+            Some("high")
+        );
 
         let error = plan_of("model_router:\n  mode: switch\n").unwrap_err();
         assert!(error.contains("active"), "{error}");
@@ -725,7 +742,10 @@ mod tests {
         assert_eq!(plan.mode, Mode::Auto);
         assert_eq!(plan.roles.len(), 3);
         assert_eq!(plan.roles["coding"].primary.model, "big");
-        assert_eq!(plan.roles["coding"].fallback.as_ref().unwrap().provider, "beta");
+        assert_eq!(
+            plan.roles["coding"].fallback.as_ref().unwrap().provider,
+            "beta"
+        );
         assert_eq!(plan.roles["fast"].fallback, None);
 
         let error = plan_of(
@@ -794,12 +814,21 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains("wizardry"), "{error}");
-        assert!(error.contains("coding"), "the allowed roles must be named: {error}");
+        assert!(
+            error.contains("coding"),
+            "the allowed roles must be named: {error}"
+        );
     }
 
     #[test]
     fn a_credential_in_the_block_is_refused_and_pointed_at_the_settings() {
-        for key in ["api_key", "apiKey", "provider_token", "password", "client_secret"] {
+        for key in [
+            "api_key",
+            "apiKey",
+            "provider_token",
+            "password",
+            "client_secret",
+        ] {
             let error = plan_of(&format!(
                 "model_router:\n  mode: manual\n  manual:\n    provider: a\n    model: b\n    {key}: sk-should-not-live-here\n",
             ))
@@ -906,7 +935,9 @@ mod tests {
         assert_eq!(plan.mode, Mode::Switch);
 
         std::fs::write(&config, "model_router:\n  mode: nonsense\n").unwrap();
-        assert!(Plan::resolve(&workspace).unwrap_err().contains("not a mode"));
+        assert!(Plan::resolve(&workspace)
+            .unwrap_err()
+            .contains("not a mode"));
 
         std::fs::remove_dir_all(&workspace).unwrap();
     }

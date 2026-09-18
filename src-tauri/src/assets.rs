@@ -26,9 +26,18 @@
 
 /// The memory backend plugin: connection, service, and the PocketBase client.
 pub const MEMORY_BACKEND: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/pocketbase-memory/index.js")),
-    ("core.js", include_str!("../../plugins/pocketbase-memory/core.js")),
-    ("client.js", include_str!("../../plugins/pocketbase-memory/client.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/pocketbase-memory/index.js"),
+    ),
+    (
+        "core.js",
+        include_str!("../../plugins/pocketbase-memory/core.js"),
+    ),
+    (
+        "client.js",
+        include_str!("../../plugins/pocketbase-memory/client.js"),
+    ),
     (
         "environment.js",
         include_str!("../../plugins/pocketbase-memory/environment.js"),
@@ -37,8 +46,14 @@ pub const MEMORY_BACKEND: &[(&str, &str)] = &[
 
 /// The provider plugin: the `remember`, `recall` and `forget` tools.
 pub const MEMORY_TOOLS: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/memory-tools/index.js")),
-    ("tools.js", include_str!("../../plugins/memory-tools/tools.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/memory-tools/index.js"),
+    ),
+    (
+        "tools.js",
+        include_str!("../../plugins/memory-tools/tools.js"),
+    ),
 ];
 
 /** The branding plugin: the product name in the interface's own title. */
@@ -54,9 +69,15 @@ pub const BRAND: &[(&str, &str)] = &[(
 /// one whose files a person reads: `ui.js` holds the two sections, `backup.js`
 /// the archive format, `platform.js` every local command it runs.
 pub const MEMORY_CONSOLE: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/memory-console/index.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/memory-console/index.js"),
+    ),
     ("ui.js", include_str!("../../plugins/memory-console/ui.js")),
-    ("backup.js", include_str!("../../plugins/memory-console/backup.js")),
+    (
+        "backup.js",
+        include_str!("../../plugins/memory-console/backup.js"),
+    ),
     (
         "platform.js",
         include_str!("../../plugins/memory-console/platform.js"),
@@ -74,10 +95,22 @@ pub const MEMORY_CONSOLE: &[(&str, &str)] = &[
  * target the catalog marks `guarded` cannot be removed at all.
  */
 pub const STORAGE_CONSOLE: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/storage-console/index.js")),
-    ("catalog.js", include_str!("../../plugins/storage-console/catalog.js")),
-    ("cleanup.js", include_str!("../../plugins/storage-console/cleanup.js")),
-    ("scan.js", include_str!("../../plugins/storage-console/scan.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/storage-console/index.js"),
+    ),
+    (
+        "catalog.js",
+        include_str!("../../plugins/storage-console/catalog.js"),
+    ),
+    (
+        "cleanup.js",
+        include_str!("../../plugins/storage-console/cleanup.js"),
+    ),
+    (
+        "scan.js",
+        include_str!("../../plugins/storage-console/scan.js"),
+    ),
     ("ui.js", include_str!("../../plugins/storage-console/ui.js")),
 ];
 
@@ -93,10 +126,22 @@ pub const STORAGE_CONSOLE: &[(&str, &str)] = &[
  * metadata, and the request rewrite that keeps the logged route truthful.
  */
 pub const MODEL_ROUTER: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/model-router/index.js")),
-    ("adaptive.js", include_str!("../../plugins/model-router/adaptive.js")),
-    ("plan.js", include_str!("../../plugins/model-router/plan.js")),
-    ("routing.js", include_str!("../../plugins/model-router/routing.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/model-router/index.js"),
+    ),
+    (
+        "adaptive.js",
+        include_str!("../../plugins/model-router/adaptive.js"),
+    ),
+    (
+        "plan.js",
+        include_str!("../../plugins/model-router/plan.js"),
+    ),
+    (
+        "routing.js",
+        include_str!("../../plugins/model-router/routing.js"),
+    ),
 ];
 
 /**
@@ -110,9 +155,18 @@ pub const MODEL_ROUTER: &[(&str, &str)] = &[
  * Cordis service and the three observational seams.
  */
 pub const CONTEXT_CACHE_MANAGER: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/context-cache-manager/index.js")),
-    ("context.js", include_str!("../../plugins/context-cache-manager/context.js")),
-    ("cache.js", include_str!("../../plugins/context-cache-manager/cache.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/context-cache-manager/index.js"),
+    ),
+    (
+        "context.js",
+        include_str!("../../plugins/context-cache-manager/context.js"),
+    ),
+    (
+        "cache.js",
+        include_str!("../../plugins/context-cache-manager/cache.js"),
+    ),
 ];
 
 /**
@@ -132,10 +186,22 @@ pub const CONTEXT_CACHE_MANAGER: &[(&str, &str)] = &[
  * the authenticated endpoint.
  */
 pub const PROJECT_MODEL: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/project-model/index.js")),
-    ("model.js", include_str!("../../plugins/project-model/model.js")),
-    ("store.js", include_str!("../../plugins/project-model/store.js")),
-    ("platform.js", include_str!("../../plugins/project-model/platform.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/project-model/index.js"),
+    ),
+    (
+        "model.js",
+        include_str!("../../plugins/project-model/model.js"),
+    ),
+    (
+        "store.js",
+        include_str!("../../plugins/project-model/store.js"),
+    ),
+    (
+        "platform.js",
+        include_str!("../../plugins/project-model/platform.js"),
+    ),
     ("git.js", include_str!("../../plugins/project-model/git.js")),
 ];
 
@@ -150,8 +216,14 @@ pub const PROJECT_MODEL: &[(&str, &str)] = &[
  * through `ctx.projectModel` and the route the Project Model already registers.
  */
 pub const PROJECTS_CONSOLE: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/projects-console/index.js")),
-    ("ui.js", include_str!("../../plugins/projects-console/ui.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/projects-console/index.js"),
+    ),
+    (
+        "ui.js",
+        include_str!("../../plugins/projects-console/ui.js"),
+    ),
 ];
 
 /**
@@ -166,9 +238,18 @@ pub const PROJECTS_CONSOLE: &[(&str, &str)] = &[
  * run against a fake DOM by the test suite, then serialised into the page.
  */
 pub const TERMINAL_CONSOLE: &[(&str, &str)] = &[
-    ("index.js", include_str!("../../plugins/terminal-console/index.js")),
-    ("terminal.js", include_str!("../../plugins/terminal-console/terminal.js")),
-    ("ui.js", include_str!("../../plugins/terminal-console/ui.js")),
+    (
+        "index.js",
+        include_str!("../../plugins/terminal-console/index.js"),
+    ),
+    (
+        "terminal.js",
+        include_str!("../../plugins/terminal-console/terminal.js"),
+    ),
+    (
+        "ui.js",
+        include_str!("../../plugins/terminal-console/ui.js"),
+    ),
 ];
 
 /// The sidebar mark: the whale NewPi shows where the engine showed its own.
@@ -320,6 +401,9 @@ mod tests {
             .flat_map(|(_, files)| files.iter())
             .map(|(_, source)| source.len())
             .sum();
-        assert!(total < 3 * 1024 * 1024, "embedded plugins grew to {total} bytes");
+        assert!(
+            total < 3 * 1024 * 1024,
+            "embedded plugins grew to {total} bytes"
+        );
     }
 }

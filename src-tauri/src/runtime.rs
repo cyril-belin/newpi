@@ -231,7 +231,10 @@ impl RuntimeLocation {
         };
 
         if !node.is_file() {
-            return Err(format!("Interpréteur Node introuvable : {}", node.display()));
+            return Err(format!(
+                "Interpréteur Node introuvable : {}",
+                node.display()
+            ));
         }
         if !entry.is_file() {
             return Err(format!(
@@ -332,7 +335,11 @@ fn last_project_root(state: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(state.join(PROJECT_REGISTRY_FILENAME)).ok()?;
     let document: serde_json::Value = serde_json::from_str(&text).ok()?;
     let id = document.get("currentId")?.as_str()?;
-    let root = document.get("projects")?.get(id)?.get("rootPath")?.as_str()?;
+    let root = document
+        .get("projects")?
+        .get(id)?
+        .get("rootPath")?
+        .as_str()?;
     let path = PathBuf::from(root);
     if path.is_dir() {
         Some(path)
@@ -774,9 +781,8 @@ fn state_directory(app: &AppHandle) -> Result<PathBuf, String> {
         .map(Path::to_path_buf)
         .unwrap_or(per_application);
     let directory = root.join("NewPi");
-    std::fs::create_dir_all(&directory).map_err(|error| {
-        format!("Création impossible de {} : {error}", directory.display())
-    })?;
+    std::fs::create_dir_all(&directory)
+        .map_err(|error| format!("Création impossible de {} : {error}", directory.display()))?;
     Ok(directory)
 }
 
@@ -887,7 +893,10 @@ fn prepare_memory(
     let credential = if memory_enabled {
         let extracted = pocketbase::ensure_executable(&layout)?;
         if extracted {
-            eprintln!("[newpi/memory] PocketBase {} extrait et vérifié", pocketbase::VERSION);
+            eprintln!(
+                "[newpi/memory] PocketBase {} extrait et vérifié",
+                pocketbase::VERSION
+            );
         }
 
         let credential = pocketbase::credential(&layout.credentials)?;
@@ -973,7 +982,12 @@ fn prepare_memory(
 
     setup.summary = match (&setup.sidecar, &project.source) {
         (Some(_), Some(source)) => {
-            format!("{} · port {} · {}", project.id, setup.port, source.display())
+            format!(
+                "{} · port {} · {}",
+                project.id,
+                setup.port,
+                source.display()
+            )
         }
         (Some(_), None) => format!(
             "{} · port {} · dérivé de {} (épinglez memory.project_id dans {})",
@@ -984,7 +998,11 @@ fn prepare_memory(
         ),
         (None, source) => format!(
             "{} · projet {} · {}",
-            if memory_enabled { "indisponible" } else { "désactivée" },
+            if memory_enabled {
+                "indisponible"
+            } else {
+                "désactivée"
+            },
             project.id,
             source
                 .as_ref()
@@ -1091,7 +1109,15 @@ mod tests {
         .unwrap();
         let row = plan.row(&layout).unwrap();
 
-        let without = launcher_rows(&layout, &project, &roots, true, false, Some(row.clone()), None);
+        let without = launcher_rows(
+            &layout,
+            &project,
+            &roots,
+            true,
+            false,
+            Some(row.clone()),
+            None,
+        );
         assert_eq!(without.last().unwrap().id, "model-router");
         assert!(!without.iter().any(|row| row.id == "pocketbase-memory"));
         assert!(without.iter().any(|row| row.id == "storage-console"));
@@ -1145,7 +1171,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(last_project_root(&state).as_deref(), Some(project.as_path()));
+        assert_eq!(
+            last_project_root(&state).as_deref(),
+            Some(project.as_path())
+        );
     }
 
     /// A registry that is missing, corrupt, or points at a directory that has
@@ -1180,7 +1209,9 @@ mod tests {
     fn the_registry_filename_matches_the_project_model() {
         let source = include_str!("../../plugins/project-model/store.js");
         assert!(
-            source.contains(&format!("REGISTRY_FILENAME = '{PROJECT_REGISTRY_FILENAME}'")),
+            source.contains(&format!(
+                "REGISTRY_FILENAME = '{PROJECT_REGISTRY_FILENAME}'"
+            )),
             "the launcher and the Project Model disagree about the registry file name",
         );
     }
@@ -1207,7 +1238,8 @@ mod tests {
 
     #[test]
     fn ignores_the_local_network_suffix() {
-        let line = "dsh web: http://127.0.0.1:7317/?token=abc (LAN: http://10.0.0.4:7317/?token=abc)";
+        let line =
+            "dsh web: http://127.0.0.1:7317/?token=abc (LAN: http://10.0.0.4:7317/?token=abc)";
         assert_eq!(
             parse_ready_url(line).as_deref(),
             Some("http://127.0.0.1:7317/?token=abc"),

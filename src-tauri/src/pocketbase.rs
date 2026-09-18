@@ -39,8 +39,7 @@ const ARCHIVE: &[u8] = include_bytes!("../../vendor/pocketbase/pocketbase_0.40.4
 
 /// SHA-256 of the pinned archive. The same value is recorded in
 /// `scripts/pocketbase-pin.mjs`, which is what downloads it.
-pub const ARCHIVE_SHA256: &str =
-    "eeb619ea4f8a06421daedb946d133bed269fea334a760941d147f76befc25ebc";
+pub const ARCHIVE_SHA256: &str = "eeb619ea4f8a06421daedb946d133bed269fea334a760941d147f76befc25ebc";
 
 /// The release tag, written next to the extracted binary so a version change is
 /// detectable without hashing thirty megabytes on every launch.
@@ -180,9 +179,8 @@ pub fn ensure_executable(layout: &Layout) -> Result<bool, String> {
         }
         // The override is recorded as a copy so the rest of the code has one
         // path to reason about.
-        std::fs::copy(&path, &layout.pocketbase).map_err(|error| {
-            format!("Copie impossible de {} : {error}", path.display())
-        })?;
+        std::fs::copy(&path, &layout.pocketbase)
+            .map_err(|error| format!("Copie impossible de {} : {error}", path.display()))?;
         let _ = std::fs::write(&layout.version, "override");
         return Ok(true);
     }
@@ -214,8 +212,12 @@ pub fn ensure_executable(layout: &Layout) -> Result<bool, String> {
         .map_err(|error| format!("Création impossible de {} : {error}", staging.display()))?;
 
     let archive_path = staging.join("pocketbase.zip");
-    std::fs::write(&archive_path, ARCHIVE)
-        .map_err(|error| format!("Écriture impossible de {} : {error}", archive_path.display()))?;
+    std::fs::write(&archive_path, ARCHIVE).map_err(|error| {
+        format!(
+            "Écriture impossible de {} : {error}",
+            archive_path.display()
+        )
+    })?;
 
     // `-d <dir>` is spelled out rather than passed through [`run`]: Info-ZIP
     // only treats the next argument as the destination when `-d` immediately
@@ -260,14 +262,21 @@ pub fn ensure_executable(layout: &Layout) -> Result<bool, String> {
 
     set_executable(&extracted)?;
     std::fs::rename(&extracted, &layout.pocketbase).map_err(|error| {
-        format!("Installation impossible de {} : {error}", layout.pocketbase.display())
+        format!(
+            "Installation impossible de {} : {error}",
+            layout.pocketbase.display()
+        )
     })?;
     let _ = std::fs::remove_dir_all(&staging);
 
     // Written last: its presence is the promise that the binary beside it was
     // verified against this version.
-    std::fs::write(&layout.version, VERSION)
-        .map_err(|error| format!("Écriture impossible de {} : {error}", layout.version.display()))?;
+    std::fs::write(&layout.version, VERSION).map_err(|error| {
+        format!(
+            "Écriture impossible de {} : {error}",
+            layout.version.display()
+        )
+    })?;
 
     Ok(true)
 }
@@ -429,7 +438,10 @@ fn is_free(port: u16) -> bool {
 fn drain<R: std::io::Read + Send + 'static>(label: &'static str, stream: R) {
     std::thread::spawn(move || {
         use std::io::BufRead;
-        for line in std::io::BufReader::new(stream).lines().map_while(Result::ok) {
+        for line in std::io::BufReader::new(stream)
+            .lines()
+            .map_while(Result::ok)
+        {
             eprintln!("[newpi/pocketbase/{label}] {line}");
         }
     });
@@ -449,7 +461,9 @@ fn health(port: u16) -> bool {
     use std::net::TcpStream;
 
     let Ok(mut stream) = TcpStream::connect_timeout(
-        &format!("127.0.0.1:{port}").parse().expect("literal address"),
+        &format!("127.0.0.1:{port}")
+            .parse()
+            .expect("literal address"),
         Duration::from_millis(500),
     ) else {
         return false;
@@ -542,7 +556,10 @@ fn path_as_str(path: &Path) -> Result<&str, String> {
 /// @param bytes - the data.
 /// @returns the digest.
 pub fn sha256_hex(bytes: &[u8]) -> String {
-    sha256(bytes).iter().map(|byte| format!("{byte:02x}")).collect()
+    sha256(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 /// SHA-256, FIPS 180-4.
@@ -715,7 +732,10 @@ mod tests {
         let created = credential(&path).unwrap();
         assert_eq!(created.identity, IDENTITY);
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600, "the credential must not be group or world readable");
+        assert_eq!(
+            mode, 0o600,
+            "the credential must not be group or world readable"
+        );
 
         // Reading it back returns the same credential rather than a new one.
         assert_eq!(credential(&path).unwrap(), created);
