@@ -1,0 +1,93 @@
+# The two suites the repository already runs: `cargo test`, then the plugin
+# tests. Nothing here is a new gate — it is `pnpm test` on a machine that knows
+# nothing about this one.
+#
+# The one real problem CI has to solve is the harness. The plugin tests import
+# `@deepseek-ai/cordis` and `@deepseek-ai/schemastery`, and two suites read
+# YAML through the harness's own copy, so a runner with no harness fails a test
+# that passes on a developer's machine. Installing the published `@deepseek-ai/dsh`
+# into a scratch prefix and pointing `DSH_PROFILE_MODULES` at its module tree
+# reproduces what a real install looks like: the postinstall copies the packages
+# it needs from that tree, and the tests resolve the rest from the same one.
+#
+# The runner is `ubuntu-latest` because it is the cheapest and the suites do not
+# launch the sidecar: they check the vendored PocketBase archive's pin and
+# hashes, not the binary. That archive is `darwin_arm64`, so nothing here proves
+# the app runs on macOS — `pnpm verify:*` does that, and it needs a real window.
+
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Kept in step with the lockfile's lockfileVersion; pnpm 10 refuses an older
+  # store format rather than migrating it silently.
+  PNPM_VERSION: 10.33.2
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # The harness paths are exported to the whole job rather than set in a
+      # job-level `env`, where the `runner` context is not available.
+      #
+      # `npm install --prefix` puts the module tree at `<prefix>/node_modules`,
+      # which is exactly the tree the harness looks for, so both variables name
+      # that one directory: `DSH_PROFILE_MODULES` is what the postinstall copies
+      # from *and* what the tests resolve through (see `harnessPath`).
+      - name: Choose the harness prefix
+        run: |
+          echo "DSH_HARNESS=$RUNNER_TEMP/harness" >> "$GITHUB_ENV"
+          echo "DSH_PROFILE_MODULES=$RUNNER_TEMP/harness/node_modules" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # cargo is set up before the install purely so the toolchain is ready by
+      # the time `pnpm test` runs; the install's own scripts do not need it.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # A real published install of the harness, in a prefix of its own: the
+      # repository must not gain a dependency on it, since it is not what the
+      # app ships against.
+      - name: Install the harness
+        run: |
+          npm install --prefix "$DSH_HARNESS" --no-audit --no-fund @deepseek-ai/dsh
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `pnpm test` is the repository's own gate: pretest runs `cargo test`,
+      # which dumps src-tauri/target/test-tmp/launcher-sample.patch.yml, and the
+      # JavaScript suites parse that file. Running `node --test` alone would
+      # silently skip those assertions.
+      - name: Run the suites
+        run: pnpm test
+
+      - name: Report what ran
+        if: always()
+        run: |
+          echo "harness tree: $(ls "$DSH_PROFILE_MODULES" 2>/dev/null | head -3 | tr '\n' ' ')"
+          echo "copied: $(ls node_modules/@deepseek-ai 2>/dev/null | tr '\n' ' ')"
