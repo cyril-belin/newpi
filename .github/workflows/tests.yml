@@ -76,6 +76,12 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check --manifest-path src-tauri/Cargo.toml
 
+      # Lints are denied rather than reported, because a warning nobody fails
+      # on is a warning that accumulates. `--all-targets` covers the test
+      # modules too, which is where the lints have actually been.
+      - name: Lint
+        run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
+
       # A real published install of the harness, in a prefix of its own: the
       # repository must not gain a dependency on it, since it is not what the
       # app ships against.

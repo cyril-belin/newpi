@@ -310,11 +310,7 @@ mod tests {
         fs::write(state.join(DEV_FILENAME), "{\"pluginsDir\": \"plugins\"}").unwrap();
 
         let source = DevSource::read(&state).unwrap();
-        assert_eq!(
-            source.reload(),
-            false,
-            "restarting a live runtime is opt-in"
-        );
+        assert!(!source.reload(), "restarting a live runtime is opt-in");
 
         fs::remove_dir_all(&state).unwrap();
     }
