@@ -1,0 +1,9 @@
+# The style `cargo fmt` enforces. `rustfmt` looks for this file beside the
+# crate's manifest, so `cargo fmt --manifest-path src-tauri/Cargo.toml` finds it.
+#
+# Both settings are written out rather than left implicit. The 100-column limit
+# is the width the code already used by hand, and `edition` keeps the formatter
+# from falling back to 2015 — which would rewrite `use` trees and closures in a
+# codebase that is edition 2021 (see `Cargo.toml`).
+max_width = 100
+edition = "2021"

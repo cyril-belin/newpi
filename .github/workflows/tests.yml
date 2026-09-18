@@ -63,11 +63,18 @@ jobs:
 
       # cargo is set up before the install purely so the toolchain is ready by
       # the time `pnpm test` runs; the install's own scripts do not need it.
+      # This action installs `rustfmt` and `clippy` alongside it.
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+
+      # The style is pinned by src-tauri/rustfmt.toml. Checking it here is what
+      # keeps it from drifting: a formatter nobody runs is a formatter nobody
+      # has.
+      - name: Check formatting
+        run: cargo fmt --all --check --manifest-path src-tauri/Cargo.toml
 
       # A real published install of the harness, in a prefix of its own: the
       # repository must not gain a dependency on it, since it is not what the
