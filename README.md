@@ -1,5 +1,48 @@
 # NewPi
 
+[![Tests](https://github.com/cyril-belin/newpi/actions/workflows/tests.yml/badge.svg)](https://github.com/cyril-belin/newpi/actions/workflows/tests.yml)
+[![Licence : MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+[![Plateforme : macOS 12+](https://img.shields.io/badge/plateforme-macOS%2012%2B-black.svg)](#prérequis)
+
+**Une application macOS native qui donne au moteur DeepSeek Harness une
+fenêtre, une mémoire de projet durable et des capacités — sans modifier le
+moteur.**
+
+![La section Projets : le projet ouvert, ses cinq capacités, les projets récents et le changement de projet](console-projects.png)
+
+## État du projet
+
+NewPi est un projet jeune, publié pour être lu, essayé et repris. Ce tableau dit
+ce qui fonctionne aujourd'hui et ce qui manque encore, sans l'arrondir.
+
+| | |
+| --- | --- |
+| **Ce qui marche** | fenêtre et cycle de vie du moteur ; mémoire durable des projets sur un PocketBase épinglé et vérifié ; sections Memory, Backup, Storage, Projets, Git, Model Router, Context & Cache et Terminal ; apparence NewPi complète (icône, nom, barre latérale) |
+| **Ce qui manque** | le runtime n'est pas embarqué : Node et `dsh` doivent être installés sur la machine ; aucun paquet signé ni notarié n'est distribué ; la décision d'embarquer le runtime reste ouverte |
+| **Plateforme** | macOS 12 ou plus. L'archive PocketBase épinglée est `darwin_arm64` : Apple Silicon pour l'instant |
+| **Preuves** | `pnpm test` exécute la suite Rust puis 257 tests JavaScript ; GitHub Actions rejoue les mêmes suites, plus `rustfmt` et `clippy` |
+| **Licence** | MIT, voir [`LICENSE`](LICENSE) |
+
+## Sommaire
+
+- [Ce qu'est NewPi](#ce-quest-newpi)
+- [Prérequis](#prérequis)
+- [Commandes](#commandes)
+- [Comment ça marche](#comment-ça-marche)
+- [Ce qui a été vérifié](#ce-qui-a-été-vérifié)
+- [Arborescence](#arborescence)
+- [Où NewPi trouve le sidecar mémoire](#où-newpi-trouve-le-sidecar-mémoire)
+- [Où NewPi trouve le runtime](#où-newpi-trouve-le-runtime)
+- [Variables d'environnement](#variables-denvironnement)
+- [Limites connues](#limites-connues)
+- [Limites de la mémoire en v1](#limites-de-la-mémoire-en-v1)
+- [Décision à trancher : embarquer le runtime ou pas](#décision-à-trancher--embarquer-le-runtime-ou-pas)
+- [Contribuer](#contribuer)
+- [Sécurité](#sécurité)
+- [Licence](#licence)
+
+## Ce qu'est NewPi
+
 NewPi est une application macOS native. Elle possède la fenêtre, le cycle de
 vie, la mémoire des projets et le lancement du moteur ; l'interface est celle
 que ce moteur sert sur la boucle locale.
@@ -54,7 +97,7 @@ est rendu en 46×15, `assets/whale.svg` se charge en 28×28 via
 `/newpi/whale.svg`, et la page ne produit aucune erreur. Le mot « HARNESS »
 n'apparaît plus nulle part dans le DOM.
 
-#### L'icône de l'application
+### L'icône de l'application
 
 `assets/logo.svg` est la source : `pnpm icon` le rastérise en
 `assets/icon-source.png` (1024 px, transparence conservée) et la CLI Tauri en
@@ -1558,3 +1601,38 @@ avant de l'exécuter. C'est le prix d'une mémoire qui marche hors ligne dès le
 premier lancement, sans second exécutable à signer dans le bundle — l'archive
 est une donnée, pas un binaire imbriqué, et `codesign -v NewPi.app` reste
 `valid on disk`.
+
+## Contribuer
+
+Les contributions sont bienvenues, et le dépôt est volontairement strict sur ce
+qu'il accepte : le code, les commentaires et les messages de commit sont en
+anglais, tout ce que l'utilisateur lit est en français. `AGENTS.md` est la carte
+du dépôt pour un agent comme pour une personne : lisez-le avant de changer
+quelque chose, puis `CONTRIBUTING.md` pour la mise en route et le portail de
+tests.
+
+Le point d'entrée est court : ouvrez une *issue* pour décrire le problème ou
+l'idée avant d'écrire du code, gardez un commit par intention, et faites passer
+`pnpm test` — c'est exactement ce que GitHub Actions rejoue. Une modification
+qui touche une affirmation de ce README ou de `docs/` doit mettre l'affirmation
+à jour dans le même commit.
+
+## Sécurité
+
+NewPi lance un moteur qui détient un jeton d'accès local et écrit dans une base
+de mémoire : la façon dont ces secrets circulent est une propriété du produit,
+pas un détail. Les invariants — la page ne reçoit jamais un secret, la page ne
+peut pas nommer un projet, le patch de lancement ne transporte aucune
+configuration secrète — sont décrits dans `SECURITY.md`, avec la marche à suivre
+pour signaler une faille en privé plutôt que dans une issue publique.
+
+## Licence
+
+NewPi est distribué sous licence **MIT** : voir [`LICENSE`](LICENSE). Vous pouvez
+l'utiliser, le modifier et le redistribuer, y compris commercialement, à
+condition de conserver la notice de copyright.
+
+NewPi n'est pas affilié à DeepSeek. Le moteur DeepSeek Harness (`dsh`) est
+installé séparément et garde sa propre licence ; ce dépôt ne le modifie ni ne le
+redistribue. PocketBase est distribué sous licence MIT par ses auteurs, et
+l'archive épinglée est vérifiée par empreinte avant d'être exécutée.

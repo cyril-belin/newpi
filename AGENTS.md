@@ -22,6 +22,7 @@ page; plugins bridge the two.
 | `pb_migrations/` | the memory schema, applied by the sidecar at boot |
 | `vendor/pocketbase/` | the pinned, checksum-verified sidecar archive |
 | `docs/` | `features.md` (what exists, in French) and `storage-audit.md` |
+| `CONTRIBUTING.md`, `SECURITY.md` | the contributor entry point and the private vulnerability channel; `LICENSE` is MIT |
 
 ## Commands
 
