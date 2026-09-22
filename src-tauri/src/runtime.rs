@@ -1109,7 +1109,9 @@ fn prepare_memory(
     }
     eprintln!(
         "[newpi/memory] projet={} port={} base={}",
-        project.map(|project| project.id.as_str()).unwrap_or("(aucun)"),
+        project
+            .map(|project| project.id.as_str())
+            .unwrap_or("(aucun)"),
         setup.port,
         layout.data.display(),
     );
@@ -1272,7 +1274,10 @@ mod tests {
             "the personal folder must never become a project",
         );
         assert_eq!(launch.directory, home_dir());
-        assert!(launch.directory.is_dir(), "the launch still needs a directory");
+        assert!(
+            launch.directory.is_dir(),
+            "the launch still needs a directory"
+        );
     }
 
     /// A legacy registry can still contain the personal-directory record an

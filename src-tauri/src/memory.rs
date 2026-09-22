@@ -403,9 +403,7 @@ impl Project {
         } else {
             None
         };
-        let namespace = pinned
-            .clone()
-            .unwrap_or_else(|| derived_id(workspace));
+        let namespace = pinned.clone().unwrap_or_else(|| derived_id(workspace));
         Ok(Self {
             id: namespace.clone(),
             name: display_name(workspace),
