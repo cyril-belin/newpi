@@ -10,10 +10,18 @@
 # reproduces what a real install looks like: the postinstall copies the packages
 # it needs from that tree, and the tests resolve the rest from the same one.
 #
-# The runner is `ubuntu-latest` because it is the cheapest and the suites do not
-# launch the sidecar: they check the vendored PocketBase archive's pin and
-# hashes, not the binary. That archive is `darwin_arm64`, so nothing here proves
-# the app runs on macOS — `pnpm verify:*` does that, and it needs a real window.
+# The runner is `macos-latest`, and that was learned by running this workflow
+# for the first time. `ubuntu-latest` is cheaper, and the suites do not launch
+# the sidecar — they check the vendored PocketBase archive's pin and hashes, not
+# the binary. But the crate depends on Tauri, whose Linux backend needs GTK,
+# WebKit and pkg-config development packages the runner does not carry, so
+# `cargo clippy` and `cargo test` both die in `glib-sys`'s build script before
+# reaching a line of this repository. The pinned archive is `darwin_arm64` as
+# well, so macOS is the only runner where the pin and the platform agree.
+#
+# This still proves nothing about the app *running*: no window opens and no
+# sidecar starts here. `pnpm verify:*` does that, and it needs a real desktop.
+# macOS runners are free for public repositories, so the choice costs nothing.
 
 name: Tests
 
@@ -34,8 +42,10 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: macos-latest
+    # A cold macOS Rust build of the Tauri crate takes far longer than the
+    # suites themselves; `Swatinem/rust-cache` makes every later run short.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v5
