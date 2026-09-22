@@ -139,14 +139,17 @@ lancement suivant le réécrit.
   au plus ancien, 8 résultats par défaut, 50 au maximum. Pas de vecteurs, pas
   d'embedding, pas d'appel externe.
 - **Cloisonnement** : une seule collection `memories` pour tous les projets,
-  séparée par la colonne `project_id`. La portée vient exclusivement du
-  `cordis.yml` du projet (`memory.project_id`), lue par NewPi avant le
-  démarrage ; les trois outils n'exposent que `content`, `kind`, `query`,
-  `limit` et `id`. Un identifiant d'un autre projet est introuvable et
-  indistinguable d'un identifiant inexistant : `forget` répond
-  `deleted: false` sans rien supprimer.
-- **Portée dérivée** : sans `cordis.yml`, NewPi dérive un identifiant stable
-  du nom du dossier et l'indique dans le journal de lancement.
+  séparée par la colonne `project_id`. La portée vient exclusivement du projet
+  ouvert dans `projects.json` (son `memoryNamespace`), ou de
+  `NEWPI_WORKSPACE` dans le chemin de compatibilité explicite. Les trois outils
+  n'exposent que `content`, `kind`, `query`, `limit` et `id`. Un identifiant
+  d'un autre projet est introuvable et indistinguable d'un identifiant
+  inexistant : `forget` répond `deleted: false` sans rien supprimer.
+- **Aucun projet ouvert** : le runtime garde le dossier personnel uniquement
+  pour pouvoir démarrer le harness, mais ne lui attribue ni nom, ni namespace,
+  ni mémoire. Memory affiche « Aucun projet ouvert » et ne lit ni n'écrit rien.
+  Les souvenirs existants dans un ancien namespace dérivé (par exemple
+  `cyril`) restent intacts et ne sont pas migrés silencieusement.
 - **Contenu attendu** : les descriptions d'outils demandent des
   **conclusions**, pas de l'activité — un bug résolu s'écrit avec symptôme,
   cause confirmée, correctif et preuve.
@@ -224,6 +227,9 @@ PocketBase plus ancien est acceptée avec un avertissement.
 - La politique de rétention est **affichée**, pas appliquée : journaux en
   rotation 7 jours / 50 Mio, sessions conservées 30 jours et 50 par projet,
   budgets indicatifs de 8 Gio pour le build et 12 Gio pour les caches.
+- Les cibles propres au projet sont toujours recalculées depuis la racine du
+  projet ouvert. Sans projet ouvert, elles sont absentes et l'en-tête affiche
+  « Aucun projet ouvert » plutôt que le dossier personnel.
 - Équivalent en ligne de commande :
 
 ```sh
@@ -547,7 +553,7 @@ le fichier est ignoré et le binaire reste la source.
 | `NEWPI_NODE` | interpréteur Node à utiliser |
 | `NEWPI_DSH_ENTRY` | point d'entrée du harness |
 | `NEWPI_DSH_BIN` | commande `dsh` à résoudre |
-| `NEWPI_WORKSPACE` | racine de travail ; par défaut le dernier projet choisi, sinon le dossier personnel |
+| `NEWPI_WORKSPACE` | racine de travail explicite ; sinon le dernier projet choisi, et le dossier personnel reste seulement le répertoire de compatibilité du harness |
 | `NEWPI_MEMORY` | `0`, `false`, `no` ou `off` désactivent la mémoire |
 | `NEWPI_POCKETBASE` | binaire PocketBase au lieu de l'archive épinglée |
 | `DSH_HOME` | lue par le harness lui-même |

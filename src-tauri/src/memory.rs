@@ -364,18 +364,28 @@ pub fn link_module_tree(layout: &Layout, dsh_home: &Path) -> Option<PathBuf> {
     Some(source)
 }
 
-/// The project's memory scope, and where it came from.
+/// The project's memory scope, its human name, and where it came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Project {
-    /// The stable identifier stored on every memory of this project.
+    /// The Project Model's stable identifier for this project.
     pub id: String,
-    /// The file the identifier was read from, when it did not come from the
-    /// workspace's name.
+    /// The human name the interface shows for it.
+    pub name: String,
+    /// The namespace every memory of this project is stored under.
+    pub namespace: String,
+    /// The project's root directory, which the harness also runs in.
+    pub root: PathBuf,
+    /// The file the namespace was pinned in, when it did not come from the
+    /// workspace's name or from the Project Model's registry.
     pub source: Option<PathBuf>,
 }
 
 impl Project {
-    /// Resolve the scope for one workspace.
+    /// Resolve the scope for one explicitly named workspace.
+    ///
+    /// This is the compatibility path — `NEWPI_WORKSPACE` — where no Project
+    /// Model record exists yet. The id is kept equal to the namespace so a
+    /// pinned `memory.project_id` still opens the same project it always did.
     ///
     /// @param workspace - the workspace root handed to the harness.
     /// @returns the scope, pinned by the project's `cordis.yml` when it names
@@ -383,24 +393,38 @@ impl Project {
     /// @throws when the configuration file exists but cannot be read.
     pub fn resolve(workspace: &Path) -> Result<Self, String> {
         let config = workspace.join(PROJECT_CONFIG);
-        if config.is_file() {
+        let pinned = if config.is_file() {
             let text = std::fs::read_to_string(&config)
                 .map_err(|error| format!("Lecture impossible de {} : {error}", config.display()))?;
-            if let Some(id) = project_id_in(&text) {
-                return Ok(Self {
-                    id,
-                    source: Some(config),
-                });
-            }
             // A file that exists but names no project is not an error: the
             // workspace is simply on the derived default. Saying so out loud
             // in the launch log is what keeps that from being a mystery.
-        }
+            project_id_in(&text)
+        } else {
+            None
+        };
+        let namespace = pinned
+            .clone()
+            .unwrap_or_else(|| derived_id(workspace));
         Ok(Self {
-            id: derived_id(workspace),
-            source: None,
+            id: namespace.clone(),
+            name: display_name(workspace),
+            namespace,
+            root: workspace.to_path_buf(),
+            source: pinned.map(|_| config),
         })
     }
+}
+
+/// The human name of a workspace, as its directory spells it.
+///
+/// @param workspace - the workspace root.
+/// @returns the directory's own name, or an empty string for a root with none.
+pub fn display_name(workspace: &Path) -> String {
+    workspace
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 /// Read `memory.project_id` out of the project configuration.
@@ -649,23 +673,64 @@ fn entry(layout: &Layout, dev: Option<&crate::dev::DevSource>, plugin: &str) -> 
         .unwrap_or_else(|| layout.plugins.join(plugin).join("index.js"))
 }
 
+/// The project facts one launch's rows all share.
+///
+/// It exists so "no project open" is represented once, as empty strings,
+/// instead of every row deciding for itself what an absent project means.
+struct ProjectScope {
+    /// The Project Model's project id, empty when none is open.
+    id: String,
+    /// The human name, empty when none is open.
+    name: String,
+    /// The memory namespace, empty when none is open.
+    namespace: String,
+    /// The project root, empty when none is open.
+    root: String,
+}
+
+impl ProjectScope {
+    /// Summarize the open project, if any.
+    fn from(project: Option<&Project>) -> Self {
+        match project {
+            Some(project) => Self {
+                id: project.id.clone(),
+                name: project.name.clone(),
+                namespace: project.namespace.clone(),
+                root: project.root.display().to_string(),
+            },
+            None => Self {
+                id: String::new(),
+                name: String::new(),
+                namespace: String::new(),
+                root: String::new(),
+            },
+        }
+    }
+}
+
 /// The launcher patch rows for one launch.
 ///
 /// @param layout - the resolved layout, whose plugin paths the rows point at.
-/// @param project - the resolved project scope.
-/// @param roots - the roots the storage console measures and is fenced by.
+/// @param project - the open project scope, or `None` when none is open.
+/// @param roots - the roots the storage console measures and is fenced by. Its
+///   `workspace` is the open project's root, or empty when there is none.
 /// @param mem0_installed - whether the profile declares Mem0, which decides
 ///   whether a non-destructive `disabled` row is worth emitting.
 /// @param dev - the development plugin source, when `dev.json` names one.
 /// @returns the rows, in application order.
 pub fn rows(
     layout: &Layout,
-    project: &Project,
+    project: Option<&Project>,
     roots: &Roots,
     mem0_installed: bool,
     dev: Option<&crate::dev::DevSource>,
 ) -> Vec<Row> {
-    let mut rows = Vec::with_capacity(8);
+    let mut rows = Vec::with_capacity(10);
+
+    // Every project fact one row carries comes from the same `Option`, so the
+    // Project Model, Memory and Storage can never disagree about which project
+    // is open — including the answer "none".
+    let scope = ProjectScope::from(project);
 
     // The branding row has nothing to do with memory and is mounted whatever
     // the memory decision is: the product name is not an optional feature. It
@@ -676,25 +741,30 @@ pub fn rows(
             .with_config("whale", crate::assets::whale_markup()),
     );
 
+    // A user message sent while the agent works belongs after that work, not
+    // in the steering channel that cancels it. The guard is page-only and has
+    // no state or secret, so it is always safe to mount with the brand.
+    rows.push(Row::plugin(
+        "session-queue-guard",
+        &entry(layout, dev, "session-queue-guard"),
+    ));
+
     // The project model is the source of truth the other rows are keyed by: the
     // memory scope, the workspace root, and the state directory its registry
     // lives under. It carries no credential and no backend port — it has no
     // database behind it — so it is mounted whether or not a sidecar came up.
-    let display_name = roots
-        .workspace
-        .file_name()
-        .map(|name| name.to_string_lossy().to_string())
-        .unwrap_or_default();
+    // With no project open it carries empty strings, which is how the model is
+    // told not to invent one from the directory the harness happens to run in.
     // The application's own identity, so the section can offer a clean restart
     // only where the system would actually find an application to open.
     let app = AppIdentity::resolve();
     rows.push(
         Row::plugin("project-model", &entry(layout, dev, "project-model"))
             .with_config("stateDir", layout.state.display().to_string())
-            .with_config("workspace", roots.workspace.display().to_string())
-            .with_config("projectId", project.id.clone())
-            .with_config("name", display_name)
-            .with_config("memoryNamespace", project.id.clone())
+            .with_config("workspace", scope.root.clone())
+            .with_config("projectId", scope.id.clone())
+            .with_config("name", scope.name.clone())
+            .with_config("memoryNamespace", scope.namespace.clone())
             .with_config("appId", app.id)
             .with_config("appBundle", app.bundle_config()),
     );
@@ -710,13 +780,15 @@ pub fn rows(
 
     // The backend carries the project scope in its configuration: this is the
     // single place the scope enters the harness, and the provider reads it from
-    // the service rather than from a tool argument.
+    // the service rather than from a tool argument. An empty scope is the
+    // refusal, not a namespace: with no project open every memory call answers
+    // `MEMORY_NO_PROJECT` instead of writing under a directory's name.
     rows.push(
         Row::plugin(
             "pocketbase-memory",
             &entry(layout, dev, "pocketbase-memory"),
         )
-        .with_config("projectId", project.id.clone()),
+        .with_config("projectId", scope.namespace.clone()),
     );
     rows.push(Row::plugin(
         "memory-tools",
@@ -724,31 +796,36 @@ pub fn rows(
     ));
 
     // The console carries the two paths and the two versions its manifests
-    // need. None of them is a secret: the credential and the sidecar's URL stay
-    // in the environment, where the interface cannot read them.
+    // need, plus the open project's human name — a display fact, never a key.
+    // None of them is a secret: the credential and the sidecar's URL stay in the
+    // environment, where the interface cannot read them.
     rows.push(
         Row::plugin("memory-console", &entry(layout, dev, "memory-console"))
             .with_config("backupDir", layout.backups.display().to_string())
             .with_config("snapshotDir", layout.snapshots().display().to_string())
             .with_config("dataDir", layout.data.display().to_string())
             .with_config("newpiVersion", env!("CARGO_PKG_VERSION"))
-            .with_config("pocketbaseVersion", crate::pocketbase::VERSION),
+            .with_config("pocketbaseVersion", crate::pocketbase::VERSION)
+            .with_config("projectName", scope.name.clone()),
     );
 
     // The storage console names the roots and the state paths, and nothing
     // else. Every one of them is a directory NewPi already resolved, and the
     // plugin refuses any id that is not in its own catalog, so a browser
     // request can never become an arbitrary path. It is mounted whether or not
-    // a sidecar came up: measuring a disk has nothing to do with memory.
+    // a sidecar came up: measuring a disk has nothing to do with memory. Its
+    // `workspace` is the open project's root and empty when none is open, so no
+    // project target ever hangs from the personal folder.
     rows.push(
         Row::plugin("storage-console", &entry(layout, dev, "storage-console"))
             .with_config("home", roots.home.display().to_string())
-            .with_config("workspace", roots.workspace.display().to_string())
+            .with_config("workspace", scope.root.clone())
             .with_config("stateDir", layout.state.display().to_string())
             .with_config("dshHome", roots.dsh_home.display().to_string())
             .with_config("dataDir", layout.data.display().to_string())
             .with_config("snapshotDir", layout.snapshots().display().to_string())
-            .with_config("backupDir", layout.backups.display().to_string()),
+            .with_config("backupDir", layout.backups.display().to_string())
+            .with_config("projectName", scope.name.clone()),
     );
 
     // The context & cache manager observes what a model call was made of and
@@ -903,6 +980,9 @@ mod tests {
         let layout = Layout::new(Path::new("/state"));
         let project = Project {
             id: "twin".to_string(),
+            name: "Twin display".to_string(),
+            namespace: "twin".to_string(),
+            root: PathBuf::from("/workspace"),
             source: None,
         };
         let roots = Roots::new(
@@ -910,8 +990,8 @@ mod tests {
             Path::new("/home"),
             Path::new("/home/.dsh"),
         );
-        let rows = rows(&layout, &project, &roots, true, None);
-        assert_eq!(rows.len(), 10);
+        let rows = rows(&layout, Some(&project), &roots, true, None);
+        assert_eq!(rows.len(), 11);
 
         // The branding row comes first and is mounted whatever else the launch
         // decides. It carries the whale artwork so the deployed plugin needs no
@@ -965,7 +1045,7 @@ mod tests {
         );
         assert_eq!(
             model.config.get("name").map(String::as_str),
-            Some("workspace")
+            Some("Twin display")
         );
         assert_eq!(
             model.config.get("memoryNamespace").map(String::as_str),
@@ -1014,6 +1094,12 @@ mod tests {
             console.config.get("newpiVersion").map(String::as_str),
             Some(env!("CARGO_PKG_VERSION")),
         );
+        // The console shows the open project's human name; it is a display
+        // fact, never the namespace the memories are keyed by.
+        assert_eq!(
+            console.config.get("projectName").map(String::as_str),
+            Some("Twin display"),
+        );
         assert!(
             console
                 .config
@@ -1037,6 +1123,7 @@ mod tests {
                 "dataDir",
                 "dshHome",
                 "home",
+                "projectName",
                 "snapshotDir",
                 "stateDir",
                 "workspace",
@@ -1046,6 +1133,10 @@ mod tests {
         assert_eq!(
             storage.config.get("workspace").map(String::as_str),
             Some("/workspace")
+        );
+        assert_eq!(
+            storage.config.get("projectName").map(String::as_str),
+            Some("Twin display")
         );
         assert_eq!(
             storage.config.get("home").map(String::as_str),
@@ -1123,6 +1214,9 @@ mod tests {
         let layout = Layout::new(Path::new("/state"));
         let project = Project {
             id: "twin".to_string(),
+            name: "twin".to_string(),
+            namespace: "twin".to_string(),
+            root: PathBuf::from("/workspace"),
             source: None,
         };
         let roots = Roots::new(
@@ -1130,10 +1224,11 @@ mod tests {
             Path::new("/home"),
             Path::new("/home/.dsh"),
         );
-        let rows = rows(&layout, &project, &roots, false, None);
-        assert_eq!(rows.len(), 9);
+        let rows = rows(&layout, Some(&project), &roots, false, None);
+        assert_eq!(rows.len(), 10);
         assert!(rows.iter().all(|row| !row.disabled));
         assert!(rows.iter().any(|row| row.id == "newpi-brand"));
+        assert!(rows.iter().any(|row| row.id == "session-queue-guard"));
         assert!(rows.iter().any(|row| row.id == "project-model"));
         assert!(rows.iter().any(|row| row.id == "projects-console"));
         assert!(rows.iter().any(|row| row.id == "memory-console"));

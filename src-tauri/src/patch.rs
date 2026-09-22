@@ -236,6 +236,9 @@ mod tests {
         let layout = crate::memory::Layout::new(Path::new("/state"));
         let project = crate::memory::Project {
             id: "twin".to_string(),
+            name: "twin".to_string(),
+            namespace: "twin".to_string(),
+            root: PathBuf::from("/workspace"),
             source: None,
         };
         let roots = crate::memory::Roots::new(
@@ -243,7 +246,7 @@ mod tests {
             Path::new("/home"),
             Path::new("/home/.dsh"),
         );
-        let mut rows = crate::memory::rows(&layout, &project, &roots, true, None);
+        let mut rows = crate::memory::rows(&layout, Some(&project), &roots, true, None);
         let plan = crate::models::Plan::parse(
             "model_router:\n  mode: auto\n  roles:\n    coding:\n      provider: alpha\n      model: big\n      reasoning: high\n      fallback:\n        provider: beta\n        model: other\n    default:\n      provider: alpha\n      model: mid\n  requirements:\n    coding:\n      tools: true\n      max_context: 64000\n",
         )

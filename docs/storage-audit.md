@@ -87,10 +87,10 @@ Tout ce qui dépasse 100 Mio, avec son rôle et sa classe.
 **Total NewPi et moteur : 3,79 Gio**, dont 3,66 Gio de sortie de compilation.
 
 Au moment de l'audit, la base mémoire contient **5 souvenirs**, tous sous le
-projet `cyril` — le dossier de travail par défaut est le dossier personnel, donc
-la portée dérivée est le nom du dossier personnel. C'est la limite déjà
-documentée dans le README (« La racine de travail vaut le dossier personnel par
-défaut »), et elle mérite d'être épinglée dans `<projet>/.newpi/cordis.yml`.
+namespace historique `cyril` — le dossier de travail par défaut était alors le
+dossier personnel. Cette observation reste historique : ces souvenirs ne sont
+ni renommés ni migrés silencieusement. Le runtime actuel n'attribue plus le
+dossier personnel à un projet lorsqu'aucun projet n'est ouvert.
 
 ---
 
@@ -364,10 +364,10 @@ Soit **49,11 Gio** disponibles sans perdre une seule information.
 
 1. **Redémarrer NewPi** pour charger la section `Storage` ; le binaire en cours
    a été compilé avant ce travail.
-2. **Épingler la portée du projet** dans `/Users/cyril/Documents/newpi/.newpi/cordis.yml`
-   (`memory.project_id: newpi`) : sans ce fichier, la portée est dérivée du nom
-   du dossier de travail, qui vaut le dossier personnel par défaut — d'où les
-   cinq souvenirs enregistrés sous `cyril`.
+2. **Ouvrir le projet dans NewPi** pour que la mémoire ait une portée : sans
+   projet ouvert, le lancement démarre dans le dossier personnel mais ne lui
+   attribue ni nom ni namespace, donc rien n'est lu ni écrit. Les cinq
+   souvenirs enregistrés sous l'ancien namespace dérivé restent intacts.
 3. **Élaguer les simulateurs inutilisés** avec `xcrun simctl delete unavailable`,
    puis appareil par appareil : c'est le plus gros poste, et le seul que NewPi
    ne doit pas toucher.

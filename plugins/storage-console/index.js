@@ -104,6 +104,8 @@ export const Config = z.object({
   snapshotDir: z.string(),
   /** Where NewPi writes the user's backups. */
   backupDir: z.string(),
+  /** The open project's human name, for display. Empty when none is open. */
+  projectName: z.string(),
   /** Log the mounted section once at load. Defaults to true. */
   announce: z.boolean(),
 });
@@ -149,6 +151,8 @@ export class StorageConsole extends Service {
   roots;
   /** The catalog, built once from those roots. */
   entries;
+  /** The open project's human name, for display. Empty when none is open. */
+  projectName;
   /** `id -> {at, report}`, the measurement cache. */
   measurements = new Map();
 
@@ -164,6 +168,7 @@ export class StorageConsole extends Service {
       state: options.stateDir ?? '',
       dshHome: options.dshHome ?? '',
     };
+    this.projectName = typeof options.projectName === 'string' ? options.projectName : '';
     this.entries = buildCatalog({
       home: this.roots.home,
       workspace: this.roots.workspace,
@@ -253,6 +258,9 @@ export class StorageConsole extends Service {
     const stale = counted.filter((entry) => entry.measurement === null).map((entry) => entry.id);
     return {
       roots: this.roots,
+      // The one identity the section shows: the same open project the Project
+      // Model and Memory are keyed by, never the directory the harness runs in.
+      project: { name: this.projectName, root: this.roots.workspace },
       scopes: SCOPES,
       policy: RETENTION_POLICY,
       entries,
@@ -441,7 +449,9 @@ export function apply(ctx, config = {}) {
     const removable = storage.entries.filter((entry) => isRemovable(entry)).length;
     ctx.logger.info(
       `${name}: Storage mounted — ${storage.entries.length} cibles, ${removable} nettoyables, ` +
-        `espace=${storage.roots.workspace || '(inconnu)'}`,
+        (storage.roots.workspace
+          ? `projet=${storage.projectName || '(sans nom)'} (${storage.roots.workspace})`
+          : 'aucun projet ouvert'),
     );
   }
 }

@@ -62,6 +62,13 @@ pub const BRAND: &[(&str, &str)] = &[(
     include_str!("../../plugins/newpi-brand/index.js"),
 )];
 
+/// The session queue guard: it changes only the Harness prompt delivery mode
+/// from interrupting to queued, so a status message cannot discard live work.
+pub const SESSION_QUEUE_GUARD: &[(&str, &str)] = &[(
+    "index.js",
+    include_str!("../../plugins/session-queue-guard/index.js"),
+)];
+
 /// The console plugin: the Memory and Backup sections, and the one
 /// authenticated endpoint behind them.
 ///
@@ -289,6 +296,7 @@ pub const PLUGINS: &[(&str, &[(&str, &str)])] = &[
     ("projects-console", PROJECTS_CONSOLE),
     ("terminal-console", TERMINAL_CONSOLE),
     ("newpi-brand", BRAND),
+    ("session-queue-guard", SESSION_QUEUE_GUARD),
 ];
 
 #[cfg(test)]

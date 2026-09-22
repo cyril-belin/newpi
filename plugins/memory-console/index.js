@@ -79,6 +79,8 @@ export const Config = z.object({
   newpiVersion: z.string(),
   /** The PocketBase version NewPi embeds, checked against every manifest. */
   pocketbaseVersion: z.string(),
+  /** The open project's human name, for display. Empty when none is open. */
+  projectName: z.string(),
   /** Log the mounted sections once at load. Defaults to true. */
   announce: z.boolean(),
 });
@@ -133,6 +135,28 @@ export function assertNumber(value, fallback, maximum) {
 }
 
 /**
+ * The status of "no project is open".
+ *
+ * It is a status, not an error: the Memory section must be able to say the
+ * honest thing rather than render a backend failure the user cannot act on.
+ * The namespace stays empty, so no read or write can ever be attributed to the
+ * directory the harness happens to run in.
+ *
+ * @param projectName - the configured human name; empty when none is open.
+ * @returns the empty scope the section renders.
+ */
+export function emptyMemoryStatus(projectName = '') {
+  return {
+    project_id: '',
+    project_name: typeof projectName === 'string' ? projectName : '',
+    no_project: true,
+    total: 0,
+    kinds: {},
+    last_write: null,
+  };
+}
+
+/**
  * The console service, reachable as `ctx.memoryConsole`.
  *
  * Every method here is one action of the browser API, in the same order as the
@@ -148,6 +172,10 @@ export class MemoryConsole extends Service {
   versions;
   /** Where the backups live. */
   backupDir;
+  /** The open project's human name, for display. Empty when none is open. */
+  projectName;
+  /** Whether a project is open at all; every memory call is scoped to one. */
+  noProject;
 
   /**
    * @param ctx - the owning Cordis context.
@@ -157,6 +185,10 @@ export class MemoryConsole extends Service {
     super(ctx, 'memoryConsole');
     this.memory = options.memory;
     this.backupDir = options.backupDir;
+    this.projectName = typeof options.projectName === 'string' ? options.projectName : '';
+    // The namespace is the authority: the console never invents one from the
+    // name, and with none there is nothing to read or write.
+    this.noProject = this.memory.projectId === '';
     this.versions = {
       newpi: options.newpiVersion,
       pocketbase: options.pocketbaseVersion,
@@ -173,10 +205,16 @@ export class MemoryConsole extends Service {
   /**
    * Report this project's memory: how much, of what kind, and how recent.
    *
+   * With no project open there is no namespace to report on, so the answer is
+   * the empty scope rather than a backend error: the section says "no project"
+   * instead of dressing a transport failure as one.
+   *
    * @returns the scope, the total, the per-kind counts and the newest write.
    */
   async memoryStatus() {
-    return this.memory.stats();
+    if (this.noProject) return emptyMemoryStatus(this.projectName);
+    const status = await this.memory.stats();
+    return { ...status, project_name: this.projectName, no_project: false };
   }
 
   /**
@@ -195,9 +233,19 @@ export class MemoryConsole extends Service {
     }
     const size = assertNumber(perPage, 25, 100);
     const at = assertNumber(page, 1, 10_000);
+    if (this.noProject) {
+      return {
+        ...emptyMemoryStatus(this.projectName),
+        items: [],
+        page: at,
+        perPage: size,
+      };
+    }
     const result = await this.memory.page({ query, kind, page: at, perPage: size });
     return {
       project_id: this.memory.projectId,
+      project_name: this.projectName,
+      no_project: false,
       items: result.items,
       total: result.total,
       page: at,
@@ -480,6 +528,7 @@ export function apply(ctx, config = {}) {
     dataDir: config.dataDir ?? '',
     newpiVersion: config.newpiVersion ?? '0.0.0',
     pocketbaseVersion: config.pocketbaseVersion ?? '0.0.0',
+    projectName: config.projectName ?? '',
   });
 
   ctx.connection.fetch.register({
@@ -493,7 +542,10 @@ export function apply(ctx, config = {}) {
 
   if (config.announce !== false) {
     ctx.logger.info(
-      `${name}: Memory and Backup mounted for project=${console.memory.projectId}` +
+      `${name}: Memory and Backup mounted for ` +
+        (console.noProject
+          ? 'aucun projet ouvert'
+          : `project=${console.memory.projectId} (${console.projectName})`) +
         (console.backupDir.length > 0 ? ` backups=${console.backupDir}` : ' (no backups directory)'),
     );
   }

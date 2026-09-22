@@ -545,6 +545,28 @@ test('the launched project is opened, bound to the workspace, and made current',
   }
 });
 
+test('an empty launcher scope leaves the personal fallback outside the project model', async () => {
+  const workspace = await directory('personal-fallback');
+  const state = await directory('no-open-project');
+  try {
+    const { model, contextCache, workspaces } = await boot({
+      workspace,
+      stateDir: state,
+      projectId: '',
+      name: '',
+      memoryNamespace: '',
+    });
+
+    assert.equal(model.currentProject, null);
+    assert.deepEqual(model.recent(), []);
+    assert.equal(workspaces.created.length, 0, 'no workspace record may be invented');
+    assert.equal(contextCache.bound, null, 'an empty scope binds no memory namespace');
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+    await rm(state, { recursive: true, force: true });
+  }
+});
+
 test('create, open and close move one current project, keeping the recents', async () => {
   const first = await directory('alpha');
   const second = await directory('beta');

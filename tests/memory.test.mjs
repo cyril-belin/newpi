@@ -361,7 +361,13 @@ test('the rows that do not need memory survive a launch without a sidecar', asyn
   const runtime = readFileSync(new URL('../src-tauri/src/runtime.rs', import.meta.url), 'utf8');
   const filter = /fn without_memory\([\s\S]*?\n\}/.exec(runtime);
   assert.ok(filter !== null, 'the launch must decide which rows survive');
-  for (const kept of ['newpi-brand', 'project-model', 'storage-console', 'context-cache-manager']) {
+  for (const kept of [
+    'newpi-brand',
+    'session-queue-guard',
+    'project-model',
+    'storage-console',
+    'context-cache-manager',
+  ]) {
     assert.match(filter[0], new RegExp(`"${kept}"`), `${kept} must survive without a sidecar`);
   }
   for (const dropped of ['pocketbase-memory', 'memory-tools', 'memory-console']) {
@@ -386,6 +392,7 @@ test('every module a plugin imports by relative path exists beside it', async ()
     'storage-console',
     'project-model',
     'newpi-brand',
+    'session-queue-guard',
   ]) {
     const root = new URL(`../plugins/${directory}/`, import.meta.url);
     // `.mjs` counts: a browser module a plugin serves is one the suite may also
@@ -431,6 +438,9 @@ test('the launcher patch Rust generates parses as the document the harness expec
     rows.map((row) => row.id),
     [
       'newpi-brand',
+      // Prompt delivery is queued so an in-flight turn is never cancelled by
+      // the user's next status question.
+      'session-queue-guard',
       // The project model comes before the plugins it is the source of truth
       // for: it names the workspace root, the memory scope, and the state
       // directory the storage console is fenced by.
@@ -467,12 +477,17 @@ test('the launcher patch Rust generates parses as the document the harness expec
   assert.ok(!whale.includes('<?xml'), 'the XML declaration is stripped for HTML embedding');
   assert.ok(whale.includes('NewPi whale'));
 
-  // The project model follows the branding row and precedes the plugins whose
+  // The project model follows the two page-only rows and precedes the plugins whose
   // scope it names. It carries the state directory, the workspace root, the
   // project id, the display name, the memory namespace, and the application
   // identity the Projects section needs to offer a clean restart — never a
   // credential and never a backend port.
-  const model = rows[1];
+  const queueGuard = rows[1];
+  assert.match(queueGuard.name, /session-queue-guard\/index\.js$/);
+  assert.equal(queueGuard.disabled, undefined);
+  assert.deepEqual(Object.keys(queueGuard.config ?? {}), []);
+
+  const model = rows[2];
   assert.match(model.name, /project-model\/index\.js$/);
   assert.equal(model.disabled, undefined);
   assert.deepEqual(Object.keys(model.config), [
@@ -492,22 +507,22 @@ test('the launcher patch Rust generates parses as the document the harness expec
 
   // The Projects section reads that model and injects itself into the page. It
   // carries no configuration and owns no endpoint, so it has nothing to leak.
-  const projects = rows[2];
+  const projects = rows[3];
   assert.match(projects.name, /projects-console\/index\.js$/);
   assert.equal(projects.disabled, undefined);
   assert.deepEqual(Object.keys(projects.config ?? {}), []);
 
-  const backend = rows[3];
+  const backend = rows[4];
   assert.equal(backend.config.projectId, 'twin');
   // The module specifier has to survive YAML as one scalar: a bare path is
   // resolved against the profile directory and would not find the plugin.
   assert.match(backend.name, /^file:\/\/\//);
   assert.match(backend.name, /pocketbase-memory\/index\.js$/);
-  assert.match(rows[4].name, /memory-tools\/index\.js$/);
+  assert.match(rows[5].name, /memory-tools\/index\.js$/);
 
   // The console row carries the two paths and two versions its manifests need,
   // and nothing that could be a secret.
-  const console = rows[5];
+  const console = rows[6];
   assert.match(console.name, /memory-console\/index\.js$/);
   assert.equal(console.config.backupDir, '/state/backups');
   assert.equal(console.config.snapshotDir, '/state/pocketbase/pb_data/backups');
@@ -518,7 +533,7 @@ test('the launcher patch Rust generates parses as the document the harness expec
   // The storage console is mounted whatever memory decides, and carries the
   // roots it measures and is fenced by — never a target it could be redirected
   // to, and never a credential.
-  const storage = rows[6];
+  const storage = rows[7];
   assert.match(storage.name, /storage-console\/index\.js$/);
   assert.equal(storage.disabled, undefined);
   assert.deepEqual(Object.keys(storage.config), [
@@ -526,29 +541,31 @@ test('the launcher patch Rust generates parses as the document the harness expec
     'dataDir',
     'dshHome',
     'home',
+    'projectName',
     'snapshotDir',
     'stateDir',
     'workspace',
-  ]);
+  ])
+  assert.equal(storage.config.projectName, 'twin')
 
   // The context & cache manager is mounted whatever memory decides too, and
   // carries no configuration at all: it observes the context and the provider's
   // cache counters, and decides nothing.
-  const cacheManager = rows[7];
+  const cacheManager = rows[8];
   assert.match(cacheManager.name, /context-cache-manager\/index\.js$/);
   assert.equal(cacheManager.disabled, undefined);
   assert.deepEqual(Object.keys(cacheManager.config ?? {}), []);
 
   // The console runs commands in the project's own directory, which travels in
   // the row: the page names a command and never a directory.
-  const terminalRow = rows[8];
+  const terminalRow = rows[9];
   assert.match(terminalRow.name, /terminal-console\/index\.js$/);
   assert.equal(terminalRow.disabled, undefined);
   assert.deepEqual(Object.keys(terminalRow.config ?? {}), ['workspace']);
   assert.equal(terminalRow.config.workspace, '/workspace');
 
-  assert.equal(rows[9].name, '@deepseek-ai/dsh-memory-mem0');
-  assert.equal(rows[9].disabled, true, 'Mem0 is disabled by a row, never removed');
+  assert.equal(rows[10].name, '@deepseek-ai/dsh-memory-mem0');
+  assert.equal(rows[10].disabled, true, 'Mem0 is disabled by a row, never removed');
 
   // The credential is deliberately absent: it travels in the environment.
   assert.ok(!text.includes('password'), 'the patch must not carry a credential');
@@ -561,12 +578,14 @@ test('every plugin exports the loader-visible shape, with no default export', as
   // and only shows up as "cannot get property ... without inject" at boot, so
   // the shape is asserted here.
   const brandPlugin = await import(new URL('plugins/newpi-brand/index.js', ROOT));
+  const queueGuardPlugin = await import(new URL('plugins/session-queue-guard/index.js', ROOT));
   const consolePlugin = await import(new URL('plugins/memory-console/index.js', ROOT));
   const projectPlugin = await import(new URL('plugins/project-model/index.js', ROOT));
   for (const [label, module, expectedInject] of [
     ['pocketbase-memory', backend, []],
     ['memory-tools', toolsPlugin, ['tools', 'pocketbaseMemory']],
     ['newpi-brand', brandPlugin, ['webServer']],
+    ['session-queue-guard', queueGuardPlugin, ['sessionController']],
     ['memory-console', consolePlugin, ['webServer', 'pocketbaseMemory', 'connection']],
     ['context-cache-manager', contextCachePlugin, []],
     // The project model mounts on a bare context and reaches every optional

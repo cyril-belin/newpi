@@ -97,7 +97,7 @@ async function writeBytes(path, bytes) {
  * @param roots - the roots the plugin is configured with.
  * @returns the service, the endpoints it registered, and the injections it made.
  */
-async function bootStorage(roots) {
+async function bootStorage(roots, options = {}) {
   const { Context } = await import(
     process.env.DSH_PROFILE_MODULES
       ? `${process.env.DSH_PROFILE_MODULES}/@deepseek-ai/cordis/lib/index.js`
@@ -134,6 +134,7 @@ async function bootStorage(roots) {
     dataDir: roots.data,
     snapshotDir: roots.snapshots,
     backupDir: roots.backups,
+    projectName: options.projectName ?? '',
   });
 
   return { ctx, storage: ctx.get('storageConsole'), tapped, routes };
@@ -476,6 +477,20 @@ test('status reports the catalog with nothing measured yet', async () => {
   }
 });
 
+test('an empty project root omits project targets instead of using a personal fallback', async () => {
+  const roots = await fakeRoots();
+  try {
+    const { storage } = await bootStorage({ ...roots, workspace: '' });
+    const status = storage.status();
+    assert.deepEqual(status.project, { name: '', root: '' });
+    for (const id of ['newpi-target', 'newpi-node-modules', 'newpi-pnpm-store']) {
+      assert.equal(status.entries.some((entry) => entry.id === id), false);
+    }
+  } finally {
+    await rm(roots.base, { recursive: true, force: true });
+  }
+});
+
 test('scan measures a scope, and the totals exclude overlapping parents', async () => {
   const roots = await fakeRoots();
   try {
@@ -769,6 +784,7 @@ test('the client runs, lands in the footer seat, and refuses an untyped confirma
     truncated: false,
   };
   const status = {
+    project: { name: 'Projet isolé', root: roots.workspace },
     roots: {
       home: roots.home,
       workspace: roots.workspace,
@@ -884,6 +900,7 @@ test('the client runs, lands in the footer seat, and refuses an untyped confirma
     assert.equal(panel.hidden, false);
 
     const texts = panel.all().map((node) => node.textContent);
+    assert.ok(texts.includes('projet Projet isolé · ' + roots.workspace));
     assert.ok(texts.includes('Build Rust du projet'));
     assert.ok(texts.includes('Sessions du moteur'));
     assert.ok(texts.includes('non supprimable ici'), 'the guarded row offers no cleanup');

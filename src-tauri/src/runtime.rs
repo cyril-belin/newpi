@@ -37,7 +37,7 @@ use serde::Serialize;
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use crate::memory::{self, Layout, Project};
+use crate::memory::{self, Layout};
 use crate::pocketbase;
 use crate::process::GroupChild;
 
@@ -293,59 +293,124 @@ fn runtime_path(node_directory: Option<&Path>) -> OsString {
     std::env::join_paths(unique(directories)).unwrap_or_default()
 }
 
-/// Workspace root the harness treats as the project directory.
+/// How one launch is scoped: where the harness runs, and which project, if
+/// any, that launch belongs to.
+///
+/// The two are deliberately separate. The harness always needs a real working
+/// directory, so a launch with no project still starts in the personal folder —
+/// but that folder is a compatibility fallback, not a project, and nothing may
+/// be attributed to it.
+struct Launch {
+    /// The directory the harness process starts in. Always a real directory.
+    directory: PathBuf,
+    /// The project that is open, when one is.
+    project: Option<memory::Project>,
+}
+
+/// Resolve the launch scope.
 ///
 /// The order, first success:
 ///
-/// 1. `NEWPI_WORKSPACE`, the explicit override a person or a script sets;
-/// 2. the last project the user chose, read from the Project Model's registry;
-/// 3. the user's home directory.
-///
-/// Step 2 is what makes "the project I was in last" survive a restart. The
-/// harness is launched with exactly one working directory, so a project chosen
-/// in the interface can only take effect on the *next* launch — which means the
-/// choice has to be read here, before the runtime exists, and not after it.
-fn resolve_workspace(state: &Path) -> PathBuf {
-    if let Some(value) = std::env::var_os(ENV_WORKSPACE) {
-        let candidate = expand_tilde(PathBuf::from(value));
-        if candidate.is_dir() {
-            return candidate;
-        }
-    }
-    if let Some(last) = last_project_root(state) {
-        return last;
-    }
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/"))
-}
-
-/// The root of the last project the user chose, read from the Project Model's
-/// registry document.
-///
-/// The document belongs to the model; this reads two fields and ignores
-/// everything else. Every way it can fail — no file, unreadable, not JSON, no
-/// current project, a root that has since been moved or deleted — is reported
-/// as "no last project", because the alternative would be an application that
-/// refuses to start over a stale recent entry.
+/// 1. `NEWPI_WORKSPACE`, the explicit override a person or a script sets. It is
+///    a project by construction: the compatibility path for a launch that has
+///    no Project Model record yet.
+/// 2. the project the Project Model has open, read from its registry. The
+///    harness is launched with exactly one working directory, so a project
+///    chosen in the interface can only take effect on the *next* launch — which
+///    means the choice has to be read here, before the runtime exists.
+/// 3. no project. The harness starts in the personal folder so the launch still
+///    works, but the folder carries no project scope and is never displayed as
+///    one.
 ///
 /// @param state - NewPi's application state directory.
-/// @returns the directory, when it is still one.
-fn last_project_root(state: &Path) -> Option<PathBuf> {
+/// @returns the directory and the open project, if any.
+/// @throws when `NEWPI_WORKSPACE` names a project whose configuration cannot be
+///   read; a launch that silently ignored it would be worse than a refusal.
+fn resolve_launch(state: &Path) -> Result<Launch, String> {
+    let explicit = std::env::var_os(ENV_WORKSPACE)
+        .map(|value| expand_tilde(PathBuf::from(value)))
+        .filter(|candidate| candidate.is_dir());
+    launch_for(state, explicit)
+}
+
+/// The scoping decision itself, with the environment already read.
+///
+/// Split from {@link resolve_launch} so a test can exercise every branch
+/// without mutating the process environment, which is shared and racy.
+///
+/// @param state - NewPi's application state directory.
+/// @param explicit - the resolved `NEWPI_WORKSPACE`, when it named a directory.
+/// @returns the directory and the open project, if any.
+fn launch_for(state: &Path, explicit: Option<PathBuf>) -> Result<Launch, String> {
+    if let Some(candidate) = explicit {
+        let project = memory::Project::resolve(&candidate)?;
+        return Ok(Launch {
+            directory: candidate,
+            project: Some(project),
+        });
+    }
+    if let Some(project) = open_project(state) {
+        return Ok(Launch {
+            directory: project.root.clone(),
+            project: Some(project),
+        });
+    }
+    Ok(Launch {
+        directory: home_dir(),
+        project: None,
+    })
+}
+
+/// The project the Project Model has open, read from its registry document.
+///
+/// The document belongs to the model; this reads the current project's record
+/// and ignores everything else. Every way it can fail — no file, unreadable,
+/// not JSON, no current project, a root that has since been moved or deleted —
+/// is reported as "no project open", because the alternatives would be an
+/// application that refuses to start over a stale entry, or one that invents a
+/// project from whichever directory it happens to run in.
+///
+/// @param state - NewPi's application state directory.
+/// @returns the open project, when the registry names one that still exists.
+fn open_project(state: &Path) -> Option<memory::Project> {
     let text = std::fs::read_to_string(state.join(PROJECT_REGISTRY_FILENAME)).ok()?;
     let document: serde_json::Value = serde_json::from_str(&text).ok()?;
     let id = document.get("currentId")?.as_str()?;
-    let root = document
-        .get("projects")?
-        .get(id)?
-        .get("rootPath")?
-        .as_str()?;
-    let path = PathBuf::from(root);
-    if path.is_dir() {
-        Some(path)
-    } else {
-        None
+    let record = document.get("projects")?.get(id)?;
+    let root = PathBuf::from(record.get("rootPath")?.as_str()?);
+    if !root.is_dir() {
+        return None;
     }
+    // A record written by an older build, or by hand, may omit the name and the
+    // namespace. Both default to the id, which is the model's own rule.
+    let name = record
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(id);
+    let namespace = record
+        .get("memoryNamespace")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(id);
+    // Older NewPi builds synthesized this exact record from the process working
+    // directory. Keep it in the registry so no user data is rewritten, but do
+    // not let that historical fallback claim the personal folder as an open
+    // project on every later launch.
+    if root == home_dir()
+        && id == memory::derived_id(&root)
+        && name == memory::display_name(&root)
+        && namespace == id
+    {
+        return None;
+    }
+    Some(memory::Project {
+        id: id.to_string(),
+        name: name.to_string(),
+        namespace: namespace.to_string(),
+        root,
+        source: None,
+    })
 }
 
 fn expand_tilde(path: PathBuf) -> PathBuf {
@@ -362,8 +427,8 @@ fn expand_tilde(path: PathBuf) -> PathBuf {
 /// The user's home directory, as the environment reports it.
 ///
 /// One of the roots the storage console measures and is fenced by. It is the
-/// same fallback `resolve_workspace` uses, kept as its own function so the two can
-/// never disagree about where home is.
+/// fallback `resolve_launch` uses for the process's working directory, kept as
+/// its own function so the two can never disagree about where home is.
 fn home_dir() -> PathBuf {
     std::env::var_os("HOME")
         .map(PathBuf::from)
@@ -508,19 +573,19 @@ impl Supervisor {
     /// @returns the supervisor and the development source, when configured.
     pub fn start(app: &AppHandle) -> Result<(Self, Option<crate::dev::DevSource>), String> {
         let location = RuntimeLocation::resolve(app)?;
-        // The state directory is resolved first because the last project the
-        // user chose lives in it, and that choice decides the workspace.
+        // The state directory is resolved first because the project the user
+        // has open lives in it, and that choice decides the launch scope.
         let state = state_directory(app)?;
-        let workspace = resolve_workspace(&state);
+        let launch = resolve_launch(&state)?;
         let port = choose_port();
 
         let dev = crate::dev::DevSource::read(&state);
 
         let (sender, receiver) = mpsc::channel();
 
-        let memory = prepare_memory(app, &workspace, &sender, dev.as_ref())?;
+        let memory = prepare_memory(app, &launch, &sender, dev.as_ref())?;
 
-        let supervisor = Self::spawn(&location, &workspace, port, memory, sender)?;
+        let supervisor = Self::spawn(&location, &launch.directory, port, memory, sender)?;
 
         let forward_app = app.clone();
         thread::spawn(move || {
@@ -834,7 +899,8 @@ fn dsh_home() -> PathBuf {
 /// the product name, the file console, and the storage console.
 ///
 /// @param app - the running application, for the splash channel and paths.
-/// @param workspace - the workspace root, which carries the project scope.
+/// @param launch - the resolved launch: the directory the harness runs in and
+///   the open project, when one is.
 /// @param report - the supervisor's event channel.
 /// @param dev - the development plugin source, when the state directory names
 ///   one: its plugins are mounted from the repository and are not deployed.
@@ -842,7 +908,7 @@ fn dsh_home() -> PathBuf {
 ///   not memory are mounted either way, and `sidecar` is `None`.
 fn prepare_memory(
     app: &AppHandle,
-    workspace: &Path,
+    launch: &Launch,
     report: &Sender<RuntimeEvent>,
     dev: Option<&crate::dev::DevSource>,
 ) -> Result<Option<MemorySetup>, String> {
@@ -863,7 +929,11 @@ fn prepare_memory(
         format!("données    {}", state.display()),
     )));
 
-    let project = Project::resolve(workspace)?;
+    // `project` is the single source of truth every project-scoped row is keyed
+    // by. The launch directory is deliberately not read here: when no project is
+    // open it is the personal folder, a compatibility fallback that must never
+    // be mistaken for a project.
+    let project = launch.project.as_ref();
 
     let mut setup = MemorySetup {
         launcher_patch: layout.launcher_patch.clone(),
@@ -927,39 +997,52 @@ fn prepare_memory(
 
     // 5. The launcher patch and the environment.
     let mem0 = memory::mem0_installed(&dsh_home(), PROFILE);
-    let roots = memory::Roots::new(workspace, &home_dir(), &dsh_home());
+    // The storage console's `workspace` root is the open project's, never the
+    // directory the harness happens to run in: with no project it is empty, and
+    // no project target hangs from the personal folder.
+    let project_root = project.map(|project| project.root.as_path());
+    let roots = memory::Roots::new(
+        project_root.unwrap_or_else(|| Path::new("")),
+        &home_dir(),
+        &dsh_home(),
+    );
 
     // 5a. The model router, when the project declares a plan. A plan that does
     //     not validate is reported and left out: an unusable routing policy must
     //     cost the user the router, not the window, and mounting a router on a
-    //     guess would be worse than mounting none.
-    let plan_row = match crate::models::Plan::resolve(workspace) {
-        Ok(Some(plan)) => match plan.row(&layout) {
-            Ok(row) => {
-                eprintln!("[newpi/models] plan de routage : mode={:?}", plan.mode);
-                Some(row)
-            }
+    //     guess would be worse than mounting none. With no project open there is
+    //     no plan to resolve: the personal folder is not a project and a
+    //     `cordis.yml` left there is not this launch's policy.
+    let plan_row = match project {
+        Some(project) => match crate::models::Plan::resolve(&project.root) {
+            Ok(Some(plan)) => match plan.row(&layout) {
+                Ok(row) => {
+                    eprintln!("[newpi/models] plan de routage : mode={:?}", plan.mode);
+                    Some(row)
+                }
+                Err(error) => {
+                    eprintln!("[newpi/models] {error}");
+                    let _ = report.send(RuntimeEvent::Log(format!("newpi/models: {error}")));
+                    None
+                }
+            },
+            Ok(None) => None,
             Err(error) => {
-                eprintln!("[newpi/models] {error}");
-                let _ = report.send(RuntimeEvent::Log(format!("newpi/models: {error}")));
+                let source = crate::models::project_config(&project.root);
+                eprintln!("[newpi/models] {}", error);
+                let _ = report.send(RuntimeEvent::Log(format!(
+                    "newpi/models: modèle non routé — {error} ({})",
+                    source.display(),
+                )));
                 None
             }
         },
-        Ok(None) => None,
-        Err(error) => {
-            let source = crate::models::project_config(workspace);
-            eprintln!("[newpi/models] {}", error);
-            let _ = report.send(RuntimeEvent::Log(format!(
-                "newpi/models: modèle non routé — {error} ({})",
-                source.display(),
-            )));
-            None
-        }
+        None => None,
     };
 
     let rows = launcher_rows(
         &layout,
-        &project,
+        project,
         &roots,
         mem0,
         setup.sidecar.is_some(),
@@ -976,38 +1059,46 @@ fn prepare_memory(
             (memory::ENV_URL, format!("http://127.0.0.1:{}", setup.port)),
             (memory::ENV_IDENTITY, credential.identity.clone()),
             (memory::ENV_PASSWORD, credential.password.clone()),
-            (memory::ENV_PROJECT_ID, project.id.clone()),
         ];
+        // The project scope enters the harness only when a project is open. With
+        // none, the variable is absent rather than a directory-derived guess, so
+        // the memory backend refuses every call instead of writing a personal
+        // namespace nobody asked for.
+        if let Some(project) = project {
+            setup
+                .environment
+                .push((memory::ENV_PROJECT_ID, project.namespace.clone()));
+        }
     }
 
-    setup.summary = match (&setup.sidecar, &project.source) {
-        (Some(_), Some(source)) => {
-            format!(
-                "{} · port {} · {}",
-                project.id,
-                setup.port,
-                source.display()
-            )
-        }
-        (Some(_), None) => format!(
-            "{} · port {} · dérivé de {} (épinglez memory.project_id dans {})",
-            project.id,
+    setup.summary = match (setup.sidecar.as_ref(), project) {
+        (Some(_), Some(project)) => format!(
+            "{} · port {}{}",
+            project.name,
             setup.port,
-            workspace.display(),
-            workspace.join(".newpi/cordis.yml").display(),
+            project
+                .source
+                .as_ref()
+                .map(|path| format!(" · {}", path.display()))
+                .unwrap_or_default(),
         ),
-        (None, source) => format!(
-            "{} · projet {} · {}",
+        (Some(_), None) => format!("aucun projet ouvert · port {}", setup.port),
+        (None, Some(project)) => format!(
+            "{} · projet {}",
             if memory_enabled {
                 "indisponible"
             } else {
                 "désactivée"
             },
             project.id,
-            source
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .unwrap_or_else(|| "port occupé".to_string()),
+        ),
+        (None, None) => format!(
+            "{} · aucun projet ouvert",
+            if memory_enabled {
+                "indisponible"
+            } else {
+                "désactivée"
+            },
         ),
     };
 
@@ -1018,7 +1109,7 @@ fn prepare_memory(
     }
     eprintln!(
         "[newpi/memory] projet={} port={} base={}",
-        project.id,
+        project.map(|project| project.id.as_str()).unwrap_or("(aucun)"),
         setup.port,
         layout.data.display(),
     );
@@ -1041,6 +1132,7 @@ fn without_memory(rows: Vec<crate::patch::Row>) -> Vec<crate::patch::Row> {
     rows.into_iter()
         .filter(|row| {
             row.id == "newpi-brand"
+                || row.id == "session-queue-guard"
                 || row.id == "project-model"
                 || row.id == "projects-console"
                 || row.id == "storage-console"
@@ -1058,7 +1150,7 @@ fn without_memory(rows: Vec<crate::patch::Row>) -> Vec<crate::patch::Row> {
 /// call has nothing to do with one.
 ///
 /// @param layout - the resolved layout.
-/// @param project - the resolved project scope.
+/// @param project - the open project scope, or `None` when none is open.
 /// @param roots - the roots the storage console is fenced by.
 /// @param mem0 - whether the profile declares Mem0.
 /// @param sidecar - whether the memory sidecar is running this launch.
@@ -1067,7 +1159,7 @@ fn without_memory(rows: Vec<crate::patch::Row>) -> Vec<crate::patch::Row> {
 /// @returns the rows to write into the launcher patch.
 fn launcher_rows(
     layout: &memory::Layout,
-    project: &memory::Project,
+    project: Option<&memory::Project>,
     roots: &memory::Roots,
     mem0: bool,
     sidecar: bool,
@@ -1095,6 +1187,9 @@ mod tests {
         let layout = crate::memory::Layout::new(Path::new("/state"));
         let project = crate::memory::Project {
             id: "twin".to_string(),
+            name: "twin".to_string(),
+            namespace: "twin".to_string(),
+            root: PathBuf::from("/workspace"),
             source: None,
         };
         let roots = crate::memory::Roots::new(
@@ -1111,7 +1206,7 @@ mod tests {
 
         let without = launcher_rows(
             &layout,
-            &project,
+            Some(&project),
             &roots,
             true,
             false,
@@ -1122,7 +1217,7 @@ mod tests {
         assert!(!without.iter().any(|row| row.id == "pocketbase-memory"));
         assert!(without.iter().any(|row| row.id == "storage-console"));
 
-        let with = launcher_rows(&layout, &project, &roots, true, true, Some(row), None);
+        let with = launcher_rows(&layout, Some(&project), &roots, true, true, Some(row), None);
         assert_eq!(with.last().unwrap().id, "model-router");
         assert!(with.iter().any(|row| row.id == "pocketbase-memory"));
     }
@@ -1132,6 +1227,9 @@ mod tests {
         let layout = crate::memory::Layout::new(Path::new("/state"));
         let project = crate::memory::Project {
             id: "twin".to_string(),
+            name: "twin".to_string(),
+            namespace: "twin".to_string(),
+            root: PathBuf::from("/workspace"),
             source: None,
         };
         let roots = crate::memory::Roots::new(
@@ -1139,12 +1237,13 @@ mod tests {
             Path::new("/home"),
             Path::new("/home/.dsh"),
         );
-        let rows = crate::memory::rows(&layout, &project, &roots, true, None);
+        let rows = crate::memory::rows(&layout, Some(&project), &roots, true, None);
         let kept: Vec<String> = without_memory(rows).into_iter().map(|row| row.id).collect();
         assert_eq!(
             kept,
             vec![
                 "newpi-brand",
+                "session-queue-guard",
                 "project-model",
                 "projects-console",
                 "storage-console",
@@ -1153,39 +1252,120 @@ mod tests {
         );
     }
 
-    /// The next launch reopens the project the interface recorded, which is the
-    /// whole point of persisting "last project": the harness has one working
-    /// directory per process, so the choice can only be read before it starts.
+    /// With no project open the launch still gets a real working directory — the
+    /// personal folder — but it is not a project: no id, no name and no memory
+    /// namespace are claimed, so nothing can be attributed to it. Before this,
+    /// the folder's name became the namespace and the interface showed the
+    /// personal folder as a project.
     #[test]
-    fn the_last_chosen_project_is_read_from_the_model_registry() {
-        let state = test_dir("last-project");
-        let project = state.join("twin");
-        std::fs::create_dir_all(&project).unwrap();
+    fn a_launch_with_no_open_project_claims_no_project() {
+        let state = test_dir("no-open-project");
+        std::fs::write(
+            state.join(PROJECT_REGISTRY_FILENAME),
+            "{\"version\":1,\"currentId\":null,\"recent\":[],\"projects\":{}}",
+        )
+        .unwrap();
+
+        let launch = launch_for(&state, None).unwrap();
+        assert!(
+            launch.project.is_none(),
+            "the personal folder must never become a project",
+        );
+        assert_eq!(launch.directory, home_dir());
+        assert!(launch.directory.is_dir(), "the launch still needs a directory");
+    }
+
+    /// A legacy registry can still contain the personal-directory record an
+    /// older launcher fabricated. It stays on disk for compatibility, but it
+    /// cannot become an open project, a memory namespace, or Storage's root.
+    #[test]
+    fn a_legacy_personal_directory_record_is_not_an_open_project() {
+        let state = test_dir("legacy-personal-directory");
+        let home = home_dir();
+        let id = crate::memory::derived_id(&home);
+        let name = crate::memory::display_name(&home);
+        std::fs::write(
+            state.join(PROJECT_REGISTRY_FILENAME),
+            serde_json::json!({
+                "version": 1,
+                "currentId": id.clone(),
+                "recent": [id.clone()],
+                "projects": {
+                    id.clone(): {
+                        "id": id,
+                        "name": name,
+                        "memoryNamespace": id,
+                        "rootPath": home,
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let launch = launch_for(&state, None).unwrap();
+        assert!(launch.project.is_none());
+        assert_eq!(launch.directory, home_dir());
+        assert!(open_project(&state).is_none());
+    }
+
+    /// The Project Model's own record is the source of truth. The launcher must
+    /// take the human name and the memory namespace from it rather than deriving
+    /// them from the directory name: when the two disagreed, the same project got
+    /// a second identity and its memory was split in two.
+    #[test]
+    fn an_open_project_carries_its_name_and_namespace_from_the_registry() {
+        let state = test_dir("open-project");
+        let root = state.join("my-app");
+        std::fs::create_dir_all(&root).unwrap();
         std::fs::write(
             state.join(PROJECT_REGISTRY_FILENAME),
             format!(
-                "{{\"version\":1,\"currentId\":\"twin\",\"recent\":[\"twin\"],\
-                  \"projects\":{{\"twin\":{{\"id\":\"twin\",\"rootPath\":{}}}}}}}",
-                serde_json::Value::String(project.display().to_string()),
+                "{{\"version\":1,\"currentId\":\"custom\",\"recent\":[\"custom\"],\
+                  \"projects\":{{\"custom\":{{\"id\":\"custom\",\"name\":\"My App\",\
+                  \"memoryNamespace\":\"my-app-memory\",\"rootPath\":{}}}}}}}",
+                serde_json::Value::String(root.display().to_string()),
             ),
         )
         .unwrap();
 
-        assert_eq!(
-            last_project_root(&state).as_deref(),
-            Some(project.as_path())
-        );
+        let launch = launch_for(&state, None).unwrap();
+        assert_eq!(launch.directory, root);
+        let project = launch.project.expect("the registry named an open project");
+        assert_eq!(project.id, "custom");
+        assert_eq!(project.name, "My App");
+        assert_eq!(project.namespace, "my-app-memory");
+        assert_eq!(project.root, root);
+    }
+
+    /// `NEWPI_WORKSPACE` is the compatibility path: an explicit directory is a
+    /// project by construction, even before the Project Model knows it, and its
+    /// derived id is exactly what a launch without the registry always used.
+    #[test]
+    fn an_explicit_workspace_is_a_project_even_without_a_registry() {
+        let state = test_dir("explicit-workspace");
+        let root = state.join("twin");
+        std::fs::create_dir_all(&root).unwrap();
+
+        let launch = launch_for(&state, Some(root.clone())).unwrap();
+        assert_eq!(launch.directory, root);
+        let project = launch.project.expect("an explicit workspace is a project");
+        assert_eq!(project.id, "twin");
+        assert_eq!(project.name, "twin");
+        assert_eq!(project.namespace, "twin");
+        assert_eq!(project.root, root);
     }
 
     /// A registry that is missing, corrupt, or points at a directory that has
-    /// since moved must cost the user their last project, never the launch.
+    /// since moved must cost the user their open project, never the launch —
+    /// and, just as important, must never fall back to inventing one.
     #[test]
     fn a_registry_that_cannot_be_used_yields_no_project() {
         let state = test_dir("last-project-unusable");
-        assert_eq!(last_project_root(&state), None, "a missing registry");
+        assert!(open_project(&state).is_none(), "a missing registry");
 
         std::fs::write(state.join(PROJECT_REGISTRY_FILENAME), "not json").unwrap();
-        assert_eq!(last_project_root(&state), None, "a corrupt registry");
+        assert!(open_project(&state).is_none(), "a corrupt registry");
 
         std::fs::write(
             state.join(PROJECT_REGISTRY_FILENAME),
@@ -1193,14 +1373,18 @@ mod tests {
               {\"gone\":{\"id\":\"gone\",\"rootPath\":\"/no/such/directory/anywhere\"}}}",
         )
         .unwrap();
-        assert_eq!(last_project_root(&state), None, "a moved project");
+        assert!(open_project(&state).is_none(), "a moved project");
 
         std::fs::write(
             state.join(PROJECT_REGISTRY_FILENAME),
             "{\"version\":1,\"currentId\":null,\"recent\":[],\"projects\":{}}",
         )
         .unwrap();
-        assert_eq!(last_project_root(&state), None, "no current project");
+        assert!(open_project(&state).is_none(), "no current project");
+        assert!(
+            launch_for(&state, None).unwrap().project.is_none(),
+            "an unusable registry must not fall back to a project",
+        );
     }
 
     /// The launcher reads a file the Project Model writes; a rename on either

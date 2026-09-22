@@ -286,9 +286,11 @@ moitié ce qu'un vrai TTY fait bien.
 Il n'y a **qu'une seule collection PocketBase** pour tous les projets. Le
 cloisonnement tient à une colonne, `project_id`, et à trois règles :
 
-- `project_id` vient exclusivement du fichier `cordis.yml` du projet, lu par
-  NewPi au démarrage. Il ne peut pas venir d'un argument d'outil : les trois
-  outils n'exposent que `content`, `kind`, `query`, `limit` et `id`.
+- `project_id` vient du projet **ouvert**, jamais d'un argument d'outil : les
+  trois outils n'exposent que `content`, `kind`, `query`, `limit` et `id`. La
+  valeur est épinglée par le `cordis.yml` du projet, puis portée par
+  l'enregistrement du Project Model (`memoryNamespace`), que NewPi relit avant
+  de démarrer le harness.
 - La portée est fixée dans la configuration du service avant que le harness ne
   démarre, et elle est recopiée dans chaque filtre PocketBase — jamais
   appliquée après coup.
@@ -307,6 +309,14 @@ Sans ce fichier, NewPi dérive un identifiant stable du nom du dossier
 (`twin`, `mon-projet`) et l'indique dans le journal de lancement. Épinglez la
 valeur dès qu'un projet compte : deux dossiers de même nom dans deux chemins
 différents partageraient sinon la même mémoire.
+
+**Sans aucun projet ouvert, il n'y a aucune portée.** Le harness a toujours
+besoin d'un dossier de travail, donc il démarre dans le dossier personnel — mais
+ce dossier est une simple compatibilité de lancement, pas un projet : NewPi ne
+lui attribue ni nom, ni namespace, ni mémoire. La section Memory affiche alors
+« Aucun projet ouvert » et ne lit ni n'écrit rien. Les souvenirs déjà
+enregistrés sous un ancien namespace dérivé (le nom du dossier personnel, par
+exemple) restent intacts et ne sont pas migrés en silence.
 
 #### Ce que l'agent doit enregistrer
 
@@ -1385,7 +1395,8 @@ lire.
 
 - La racine de travail suit le **dernier projet choisi** : `NEWPI_WORKSPACE`
   quand il est défini, sinon le projet courant de `projects.json`, sinon le
-  dossier personnel. Le choix fait dans la section Projets est donc repris au
+  dossier personnel — qui n'est alors **pas** un projet et ne porte aucune
+  portée mémoire. Le choix fait dans la section Projets est donc repris au
   lancement suivant ; en revanche, le moteur garde son dossier tant qu'il tourne,
   parce qu'un processus a un seul dossier de travail et une seule base mémoire.
   C'est pourquoi l'interface annonce le redémarrage au lieu de le laisser

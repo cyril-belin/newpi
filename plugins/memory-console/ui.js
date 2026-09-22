@@ -350,6 +350,9 @@ export function clientConsole() {
         detail: null,
         loaded: false,
         focusSearch: false,
+        // True once the server answered that no project is open. It is a state,
+        // not an error: the section says so instead of blaming the backend.
+        noProject: false,
       },
       backup: { status: null, inspection: null, report: null, busy: false, activity: '' },
     };
@@ -448,6 +451,23 @@ export function clientConsole() {
 
     if (memory.detail !== null) {
       renderDetail(state, memory.detail);
+      return;
+    }
+
+    // With no project open there is no namespace to read: saying so is the
+    // whole answer, and it keeps the personal folder from reading as a project.
+    if (memory.noProject) {
+      state.project.textContent = 'Aucun projet ouvert';
+      var empty = el('div', 'npc-empty');
+      empty.appendChild(el('h3', null, 'Aucun projet ouvert'));
+      empty.appendChild(
+        el(
+          'p',
+          null,
+          'Ouvrez un projet dans la section Projets pour consulter et écrire sa mémoire.',
+        ),
+      );
+      body.appendChild(empty);
       return;
     }
 
@@ -607,11 +627,16 @@ export function clientConsole() {
         memory.items = append ? memory.items.concat(value.items) : value.items;
         memory.total = value.total;
         memory.loaded = true;
+        memory.noProject = value.no_project === true;
         return call('memory.status', {});
       })
       .then(function (stats) {
         memory.stats = stats;
-        state.project.textContent = stats.project_id;
+        // The header names the project the way the Project Model names it; the
+        // namespace stays out of the interface.
+        state.project.textContent = stats.no_project === true
+          ? 'Aucun projet ouvert'
+          : (stats.project_name || stats.project_id);
         setBusy(state, false);
         renderMemory(state);
       })

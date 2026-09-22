@@ -32,6 +32,13 @@ const MIB = 1024 * 1024;
 /** One gibibyte. */
 const GIB = 1024 * MIB;
 
+/** Targets that exist only below an open project's root. */
+const PROJECT_TARGET_IDS = new Set([
+  'newpi-target',
+  'newpi-node-modules',
+  'newpi-pnpm-store',
+]);
+
 /** The role a directory plays, which decides how it is read and rotated. */
 export const ROLES = Object.freeze({
   build: 'build',
@@ -143,9 +150,10 @@ function under(base, ...parts) {
  *
  * Every path is computed from the roots NewPi already resolved, so the view
  * measures the machine it is actually running on rather than a hardcoded
- * guess. A root that is unknown yields a `null` path and the entry is reported
- * as absent rather than dropped: a row that disappears is a row nobody can
- * reason about.
+ * guess. The three project-only targets are omitted when no project is open:
+ * showing an unnamed build target with no root would imply a project that does
+ * not exist. Other absent paths stay reported as `null`, because they are
+ * still machine-level facts.
  *
  * @param roots - the resolved roots.
  * @param roots.home - the user's home directory.
@@ -627,7 +635,7 @@ export function buildCatalog(roots) {
     cost: 'Hors du périmètre de NewPi. Supprimer un profil efface l\'historique et les sessions de ses sites.',
   });
 
-  return entries;
+  return workspace === '' ? entries.filter((entry) => !PROJECT_TARGET_IDS.has(entry.id)) : entries;
 }
 
 /**

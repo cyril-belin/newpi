@@ -1031,8 +1031,14 @@ export class ProjectModelService extends Service {
   async start() {
     await this._ensureRegistry();
     const project = await this._ensureLaunchProject();
-    await this._bind(project, { allowMissing: true });
-    await this._commit();
+    // No project is a real state, not a failure: the launcher said so by
+    // carrying an empty scope, and the model stays empty until the interface
+    // opens one. Binding or committing here would invent the very record the
+    // empty scope exists to prevent.
+    if (project !== null) {
+      await this._bind(project, { allowMissing: true });
+      await this._commit();
+    }
     this._subscribe();
     this._emit('ready', project);
     return this;
@@ -1059,6 +1065,16 @@ export class ProjectModelService extends Service {
    * so its root is updated rather than a second project created.
    */
   async _ensureLaunchProject() {
+    // An empty launcher scope is NewPi's explicit "no project" state. Falling
+    // back to `process.cwd()` here used to recreate a personal-folder project
+    // after the Rust host had deliberately left the scope empty.
+    if (
+      this._configuredId === '' &&
+      this._configuredName === '' &&
+      this._configuredNamespace === ''
+    ) {
+      return null
+    }
     const rootPath = await this._canonicalRoot(this._workspace !== '' ? this._workspace : process.cwd());
     const id = this._configuredId !== '' ? this._configuredId : deriveProjectId(rootPath);
     const existing = this.registry.projects[id];

@@ -427,8 +427,11 @@ export function clientStorage() {
     });
     state.body.appendChild(list);
 
+    var project = data.project || {};
     state.summary.textContent =
-      data.roots.workspace ? 'projet ' + data.roots.workspace : '';
+      project.name && project.root
+        ? 'projet ' + project.name + ' · ' + project.root
+        : 'Aucun projet ouvert';
   }
 
   // --------------------------------------------------------------- actions

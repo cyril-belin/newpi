@@ -81,7 +81,7 @@ const VERSIONS = { newpi: '0.1.0', pocketbase: '0.40.4' };
  * @param options.snapshotDir - where the sidecar keeps its snapshots.
  * @returns the console, and what the fake services recorded.
  */
-async function bootConsole({ baseUrl, projectId, backupDir, snapshotDir, dataDir }) {
+async function bootConsole({ baseUrl, projectId, projectName = '', backupDir, snapshotDir, dataDir }) {
   const backend = await import('../plugins/pocketbase-memory/index.js');
   const { Context } = await import(
     process.env.DSH_PROFILE_MODULES
@@ -121,6 +121,7 @@ async function bootConsole({ baseUrl, projectId, backupDir, snapshotDir, dataDir
     dataDir,
     newpiVersion: VERSIONS.newpi,
     pocketbaseVersion: VERSIONS.pocketbase,
+    projectName,
     announce: false,
   });
   const console = ctx.get('memoryConsole');
@@ -267,6 +268,7 @@ test('memory.status counts by kind and reports the newest write', async () => {
     const alpha = await bootConsole({
       baseUrl: pocketbase.baseUrl,
       projectId: 'alpha',
+      projectName: 'Alpha',
       backupDir: dirs.backups,
       snapshotDir: dirs.snapshots,
       dataDir: dirs.data,
@@ -274,6 +276,7 @@ test('memory.status counts by kind and reports the newest write', async () => {
     const beta = await bootConsole({
       baseUrl: pocketbase.baseUrl,
       projectId: 'beta',
+      projectName: 'Beta',
       backupDir: dirs.backups,
       snapshotDir: dirs.snapshots,
       dataDir: dirs.data,
@@ -290,6 +293,8 @@ test('memory.status counts by kind and reports the newest write', async () => {
 
     const stats = await alpha.call('memory.status', {});
     assert.equal(stats.project_id, 'alpha');
+    assert.equal(stats.project_name, 'Alpha');
+    assert.equal(stats.no_project, false);
     assert.equal(stats.total, 2, 'another project must not be counted');
     assert.equal(stats.kinds.note, 1);
     assert.equal(stats.kinds.bugfix, 1);
@@ -298,6 +303,38 @@ test('memory.status counts by kind and reports the newest write', async () => {
     assert.equal(new Date(stats.last_write).getTime() > 0, true, 'last_write is ISO 8601');
   } finally {
     await pocketbase.stop();
+    await rm(dirs.root, { recursive: true, force: true });
+  }
+});
+
+test('an empty memory namespace reports no project without querying a fallback directory', async () => {
+  const dirs = await workspace();
+  try {
+    const booted = await bootConsole({
+      baseUrl: 'http://127.0.0.1:1',
+      projectId: '',
+      projectName: '',
+      backupDir: dirs.backups,
+      snapshotDir: dirs.snapshots,
+      dataDir: dirs.data,
+    });
+
+    const status = await booted.call('memory.status');
+    assert.deepEqual(status, {
+      project_id: '',
+      project_name: '',
+      no_project: true,
+      total: 0,
+      kinds: {},
+      last_write: null,
+    });
+    assert.deepEqual(await booted.call('memory.page', {}), {
+      ...status,
+      items: [],
+      page: 1,
+      perPage: 25,
+    });
+  } finally {
     await rm(dirs.root, { recursive: true, force: true });
   }
 });
@@ -1381,6 +1418,10 @@ test('the rows land in the footer seat, and never in the engine’s panel list',
     assert.ok(footer, 'the footer seat is missing');
     assert.deepEqual(footer.children.map((child) => textOf(child).trim()), ['Memory', 'Backup']);
     // And the sections open from there.
+    footer.children[0].click();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(calls.map((call) => call.action), ['memory.page', 'memory.status']);
+    calls.length = 0;
     footer.children[1].click();
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(calls.map((call) => call.action), ['backup.status']);
