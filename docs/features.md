@@ -473,6 +473,26 @@ route authentifiée sur la connexion partagée.
   processus. Un délai de 30 minutes arrête de lui-même une commande qui ne
   revient pas.
 
+### 3.10 File d'attente des messages — `session-queue-guard`
+
+Un message envoyé pendant qu'un agent travaille doit attendre la fin du tour
+plutôt que de l'interrompre : une question de statut ne doit pas annuler le
+travail sur lequel elle porte.
+
+- **Ce qu'il est** : `index.js` enveloppe l'unique couture d'admission du
+  harness — la méthode `prompt` du service `sessionController` — et remplace la
+  valeur documentée `mode: 'steer'` par `mode: 'queue'`. Le client du harness
+  passe par son transport RPC, et non par le `fetch` de la page : c'est le seul
+  endroit qui couvre tous les clients à la fois.
+- **Ce qu'il n'est pas** : il ne crée aucun message, ne réessaie aucun appel de
+  modèle et ne touche à aucune autre valeur. Une demande qui n'est pas `steer`
+  traverse sans être modifiée, la demande reçue n'est jamais mutée, et un second
+  montage ne double pas l'enveloppe (marque par `Symbol`). Si la couture
+  n'existe pas, il refuse de se monter au lieu de rester silencieusement inactif.
+- **Pourquoi cette couture** : la page possède l'interface du message et le
+  harness possède l'admission ; NewPi ne change que la valeur documentée, à
+  l'endroit exact où elle est admise.
+
 ## 4. Sécurité et cloisonnement
 
 1. **La page distante ne reçoit aucune API Tauri.** L'écran de démarrage, qui

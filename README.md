@@ -1298,6 +1298,11 @@ retirés. La preuve brute est écrite dans
 
 ```
 newpi/
+├── README.md                 ce document : de quoi décider si NewPi vous convient
+├── CONTRIBUTING.md           mise en route, portail de tests, invariants
+├── SECURITY.md               le canal privé de signalement des failles
+├── AGENTS.md                 la carte du dépôt, pour un agent comme pour une personne
+├── LICENSE                   MIT
 ├── package.json              scripts pnpm et CLI Tauri
 ├── ui/index.html             écran de démarrage local
 ├── pb_migrations/            migrations PocketBase versionnées
@@ -1327,7 +1332,9 @@ newpi/
 │   ├── projects-console/     la section Projets, qui lit le modèle ci-dessus
 │   │   ├── ui.js             la section injectée : barre latérale, panneau, choix, autorisations, zone Git
 │   │   └── index.js          le service `ctx.projectsConsole`, sans endpoint
-│   └── newpi-brand/          le nom du produit dans le titre de l'interface
+│   ├── terminal-console/     la console : une commande à la fois, sortie en flux NDJSON
+│   ├── newpi-brand/          le nom du produit dans le titre de l'interface
+│   └── session-queue-guard/  un message envoyé pendant un tour attend la fin de ce tour
 ├── docs/
 │   ├── features.md           l'inventaire des fonctionnalités, en table
 │   └── storage-audit.md      l'audit disque : inventaire, causes, rétention
@@ -1345,6 +1352,7 @@ newpi/
 │   ├── probe-projects-ui.mjs  pilote un vrai navigateur sur la section Projets
 │   ├── probe-projects-git-ui.mjs  monte un dépôt et un distant bare, et prouve la zone Git
 │   ├── probe-projects-capability-ui.mjs  prouve le réseau refusé, autorisé, refusé, sans dépôt ni réseau
+│   ├── probe-scope-ui.mjs    prouve la portée du lancement : projet ouvert, changement, aucun projet
 │   └── storage.mjs           la commande `pnpm storage` : tableau, aperçu, nettoyage
 ├── tests/
 │   ├── memory.test.mjs       comportement des plugins mémoire
@@ -1355,6 +1363,7 @@ newpi/
 │   ├── project-model.test.mjs registre, garde, capacités, sessions, endpoint
 │   ├── project-git.test.mjs   Git sur de vrais dépôts et un distant bare
 │   ├── projects-console.test.mjs section Projets : injection, DOM, zone Git, autorisations
+│   ├── session-queue-guard.test.mjs  la file d'attente des messages, et son unique couture
 │   ├── fake-pocketbase.mjs   faux PocketBase, filtres et sauvegardes compris
 │   ├── pocketbase-live.mjs   preuve contre le vrai binaire
 │   └── backup-live.mjs       sauvegarde, suppression, restauration, vérification
