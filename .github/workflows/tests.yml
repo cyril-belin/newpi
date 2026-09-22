@@ -95,12 +95,47 @@ jobs:
       # A real published install of the harness, in a prefix of its own: the
       # repository must not gain a dependency on it, since it is not what the
       # app ships against.
+      #
+      # The version is pinned, and the pin is not cosmetic. The harness is
+      # published as release candidates and the suites import it by module path,
+      # so `latest` moving is enough to turn this gate red without a line of this
+      # repository changing — which is how this workflow first failed. Bumping
+      # the number is a deliberate act.
+      #
+      # `dsh` installs `dsh-tools` inside its own `node_modules`: npm keeps it
+      # nested there, while `tests/memory.test.mjs` reads
+      # `$DSH_PROFILE_MODULES/@deepseek-ai/dsh-tools/lib/index.js` directly and
+      # `scripts/link-harness-modules.mjs` looks for it at the tree root. A link
+      # gives both of them that path without moving the package, so its own
+      # imports still resolve where npm resolved them. Asking npm for
+      # `dsh-tools` as a second root dependency instead is not an option: it
+      # makes peer resolution fail outright, which is how this fix was found.
       - name: Install the harness
         run: |
-          npm install --prefix "$DSH_HARNESS" --no-audit --no-fund @deepseek-ai/dsh
+          npm install --prefix "$DSH_HARNESS" --no-audit --no-fund @deepseek-ai/dsh@0.1.5-rc.2
+          if [ ! -e "$DSH_PROFILE_MODULES/@deepseek-ai/dsh-tools" ]; then
+            nested=$(find "$DSH_HARNESS/node_modules" -type d -path '*/@deepseek-ai/dsh-tools' | head -1)
+            test -n "$nested"
+            ln -s "$nested" "$DSH_PROFILE_MODULES/@deepseek-ai/dsh-tools"
+          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # `pnpm install` copies the harness modules the tests import, but it is
+      # deliberately tolerant: on a machine with no usable harness it prints one
+      # note and carries on, because only the memory suites need one. Without
+      # this step, a harness that stops shipping a module shows up as five
+      # suites failing on module resolution, which names the symptom and not the
+      # cause. Assert the contract where the cause is still visible.
+      - name: Check the harness contract
+        run: |
+          for module in cordis schemastery dsh-tools; do
+            if [ ! -d "node_modules/@deepseek-ai/$module" ]; then
+              echo "::error::node_modules/@deepseek-ai/$module is missing: the harness tree at $DSH_PROFILE_MODULES does not satisfy the three modules the suites import (see PACKAGES in scripts/link-harness-modules.mjs)"
+              exit 1
+            fi
+          done
 
       # `pnpm test` is the repository's own gate: pretest runs `cargo test`,
       # which dumps src-tauri/target/test-tmp/launcher-sample.patch.yml, and the
