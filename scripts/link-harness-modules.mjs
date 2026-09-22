@@ -33,7 +33,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -99,6 +99,13 @@ function copyPath(name) {
  * Resolution starts from the checkout so a dependency already present in the
  * project wins, and falls back to the harness tree.
  *
+ * The destination is never a source. On a second run — a second `pnpm install`,
+ * which is ordinary — the copy this script made last time is what resolution
+ * finds first in the checkout, and the loop below deletes the destination
+ * before reading it. That left an empty directory behind and five suites
+ * failing on a module that had been copied correctly a moment earlier. A run
+ * that copies nothing is worse than a run that fails, because nothing says so.
+ *
  * @param name the package name.
  * @returns its directory, or `undefined` when it is nowhere to be found.
  */
@@ -106,7 +113,8 @@ function sourceOf(name) {
   const require = createRequire(join(ROOT, 'noop.js'));
   for (const from of [ROOT, tree]) {
     try {
-      return dirname(require.resolve(`${name}/package.json`, { paths: [from] }));
+      const found = dirname(require.resolve(`${name}/package.json`, { paths: [from] }));
+      if (found !== target && !found.startsWith(`${target}${sep}`)) return found;
     } catch {
       // Not here; try the next root.
     }
