@@ -22,6 +22,7 @@
     "verify:projects": "node scripts/probe-projects-ui.mjs",
     "verify:projects-git": "node scripts/probe-projects-git-ui.mjs",
     "verify:projects-capability": "node scripts/probe-projects-capability-ui.mjs",
+    "verify:scope": "node scripts/probe-scope-ui.mjs",
     "storage": "node scripts/storage.mjs",
     "acceptance:session": "node scripts/acceptance-memory-e2e.mjs",
     "fetch:pocketbase": "node scripts/fetch-pocketbase.mjs"
